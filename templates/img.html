@@ -1,0 +1,17 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+    <a href="{{ url_for('index') }}"><---Back</a><br>
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for msg in messages %}
+                <p>{{ msg }}</p>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    {% if base_url %}
+        {% for i in base_url %}
+            <img src="{{ i }}" alt="" width="100px" height="100px">
+        {% endfor %}
+    {% endif %}
+{% endblock %}

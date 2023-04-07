@@ -8,7 +8,9 @@ from dropbox.oauth import DropboxOAuth2Flow
 from dropbox.exceptions import AuthError
 from dropbox import files, sharing
 
-import config
+import src.config
+
+config = src.config
 
 app = flask.Flask(__name__)
 
@@ -105,13 +107,11 @@ class DropboxOauth2Connect:
                             requested_visibility=dropbox.sharing.RequestedVisibility.public)
                         shared_link = dbx.sharing_create_shared_link_with_settings(entry.id, settings)
                         preview_url = shared_link.url.replace("?dl=0", "?raw=1")
-                except:
+                except Exception as e:
+                    print(e)
                     preview_url = None
                 if preview_url:
                     preview_urls.append(preview_url)
                 if len(preview_urls) > 10:
                     break
         return preview_urls
-
-
-

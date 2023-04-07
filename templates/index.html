@@ -8,9 +8,9 @@
             {% endfor %}
         {% endif %}
     {% endwith %}
-    <a href='{{ url_for('google_photos') }}'>Your Google photos</a><br>
-    <a href='{{ url_for('dropbox_photos') }}'>Your Dropbox photos</a><br>
-    <a href='{{ url_for('clear_google_credentials') }}'>Logout from Google Photos</a><br>
-    <a href='{{ url_for('clear_dropbox_credentials') }}'>Logout from Dropbox</a><br>
-    <a href='{{ url_for('revoke') }}'>Reworked token</a>
+    <a href='{{ url_for('photos.google_photos') }}'>Your Google photos</a><br>
+    <a href='{{ url_for('photos.dropbox_photos') }}'>Your Dropbox photos</a><br>
+    <a href='{{ url_for('register') }}'>Sing Up</a><br>
+    <a href='{{ url_for('login') }}'>Login</a><br>
+    <a href='{{ url_for('profile') }}'>Profile</a><br>
 {% endblock %}

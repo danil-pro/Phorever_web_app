@@ -1,0 +1,21 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+{% with messages = get_flashed_messages() %}
+    {% if messages %}
+        {% for msg in messages %}
+            <p>{{ msg }}</p>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+<form method="POST" action="{{ url_for('login') }}">
+    {% if form.csrf_token %}
+        {{ form.csrf_token }}
+    {% endif %}
+    <label for="username">Email:</label>
+    {{ form.email }}
+    <label for="password">Password:</label>
+    {{ form.password }}
+    {{ form.submit }}
+</form>
+{% endblock %}

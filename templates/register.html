@@ -1,0 +1,30 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for msg in messages %}
+                <p>{{ msg }}</p>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    <form method="POST" action="{{ url_for('register') }}">
+      {{ form.csrf_token }}
+      <p>
+        <label>Email:</label>
+        {{ form.email() }}
+      </p>
+      <p>
+        <label>Password:</label>
+        {{ form.password() }}
+      </p>
+      <p>
+        <label>Confirm Password:</label>
+        {{ form.confirm_password() }}
+      </p>
+      <p>
+        {{ form.submit() }}
+      </p>
+    </form>
+
+{% endblock %}

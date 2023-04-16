@@ -1,0 +1,16 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for msg in messages %}
+                <p>{{ msg }}</p>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+        <form method="post" action="{{ url_for('auth.verify_email', email=email) }}">
+            <label for="verification_code">Verification Code:</label>
+            <input type="number" id="verification_code" name="verification_code">
+            <button type="submit">Verify</button>
+        </form>
+{% endblock %}

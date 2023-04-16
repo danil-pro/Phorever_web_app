@@ -8,7 +8,7 @@
         {% endfor %}
     {% endif %}
 {% endwith %}
-<form method="POST" action="{{ url_for('login') }}">
+<form method="POST" action="{{ url_for('auth.login') }}">
     {% if form.csrf_token %}
         {{ form.csrf_token }}
     {% endif %}

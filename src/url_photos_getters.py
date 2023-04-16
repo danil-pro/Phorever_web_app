@@ -1,6 +1,7 @@
 
 import flask
 from flask import *
+from src.auth import current_user
 
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
@@ -41,6 +42,7 @@ def google_authorize():
         redirect_uri=GOOGLE_REDIRECT_URI
     )
     authorization_url, state = flow.authorization_url(
+        prompt='consent',
         access_type='offline',
         include_granted_scopes='true'
     )
@@ -50,7 +52,7 @@ def google_authorize():
 
 @photos.route('/google_oauth2callback')
 def google_oauth2callback():
-    # state = session['state']
+    state = session['state']
     credentials = google_auth.build_credentials(request.url)
     session['credentials'] = google_auth.credentials_to_dict(credentials)
     return redirect(url_for('photos.google_photos'))
@@ -58,13 +60,13 @@ def google_oauth2callback():
 
 @photos.route('/google_photos')
 def google_photos():
-    if session['authenticated']:
+    if current_user.is_authenticated:
         if 'credentials' not in session:
             return redirect(url_for('photos.google_authorize'))
         credentials = Credentials.from_authorized_user_info(session['credentials'])
         base_url = google_auth.photos(credentials)
         return render_template('img.html', base_url=base_url)
-    return redirect(url_for('login'))
+    return redirect(url_for('auth.login'))
 
 
 @photos.route('/dropbox_authorize')
@@ -88,7 +90,7 @@ def dropbox_oauth2callback():
 
 @photos.route('/dropbox_photos')
 def dropbox_photos():
-    if session['authenticated']:
+    if current_user.is_authenticated:
         if 'access_token' not in session:
             authorize_url = authenticator.start_auth()
             return flask.redirect(authorize_url)
@@ -100,4 +102,4 @@ def dropbox_photos():
 
         except AuthError as e:
             print(e)
-    return redirect(url_for('login'))
+    return redirect(url_for('auth.login'))

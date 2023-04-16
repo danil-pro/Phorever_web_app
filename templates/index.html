@@ -10,7 +10,7 @@
     {% endwith %}
     <a href='{{ url_for('photos.google_photos') }}'>Your Google photos</a><br>
     <a href='{{ url_for('photos.dropbox_photos') }}'>Your Dropbox photos</a><br>
-    <a href='{{ url_for('register') }}'>Sing Up</a><br>
-    <a href='{{ url_for('login') }}'>Login</a><br>
-    <a href='{{ url_for('profile') }}'>Profile</a><br>
+    <a href='{{ url_for('auth.register') }}'>Sing Up</a><br>
+    <a href='{{ url_for('auth.login') }}'>Login</a><br>
+    <a href='{{ url_for('auth.profile') }}'>Profile</a><br>
 {% endblock %}

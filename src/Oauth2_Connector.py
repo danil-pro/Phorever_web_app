@@ -1,7 +1,8 @@
-import flask
+# import flask
 
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
+
 
 import dropbox
 from dropbox.oauth import DropboxOAuth2Flow
@@ -10,9 +11,15 @@ from dropbox import files, sharing
 
 import src.config
 
+import datetime
+
+import httplib2
+
+
 config = src.config
 
-app = flask.Flask(__name__)
+# GOOGLE_REDIRECT_URI = config.GOOGLE_REDIRECT_URI
+# app = flask.Flask(__name__)
 
 
 class GoogleOauth2Connect:

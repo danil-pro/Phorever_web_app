@@ -1,23 +1,16 @@
 from flask_user import UserManager
 from src.Forms import RegisterForm, LoginForm
-from flask_login import LoginManager, login_user, current_user, login_required, logout_user, set_login_view
+from flask_login import LoginManager, login_user, current_user, logout_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from src.url_photos_getters import photos
-from src.config import SECRET_KEY
 from flask import *
-from flask_migrate import Migrate
 from src.model import db, Users
-from itsdangerous import URLSafeTimedSerializer
 from flask_mail import Mail, Message
-import smtplib
-from email.mime.text import MIMEText
 import random
-from email.mime.multipart import MIMEMultipart
 
-smtp_server = 'smtp.gmail.com'
-smtp_port = 587
-smtp_username = 'danishevchuk@gmail.com'  # Ваше имя пользователя Gmail
-smtp_password = 'odqczelfissfcrro'  # Ваш пароль Gmail
+# smtp_server = 'smtp.gmail.com'
+# smtp_port = 587
+# smtp_username = 'danishevchuk@gmail.com'  # Ваше имя пользователя Gmail
+# smtp_password = 'odqczelfissfcrro'  # Ваш пароль Gmail
 
 auth = Blueprint('auth', __name__, template_folder='../templates', static_folder='../static')
 

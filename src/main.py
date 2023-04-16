@@ -1,18 +1,10 @@
-from flask_user import UserManager
-from src.Forms import RegisterForm, LoginForm
-from flask_login import set_login_view
-from werkzeug.security import generate_password_hash, check_password_hash
 from src.auth import auth, init_login_app
-from src.url_photos_getters import google_auth
 from src.url_photos_getters import photos
-from src.config import SECRET_KEY
+from src.config import *
 from flask import *
-from flask_migrate import Migrate
-from src.model import db, Users
+from src.model import db
 from google.oauth2.credentials import Credentials
 import requests
-from itsdangerous import URLSafeTimedSerializer
-from flask_mail import Mail, Message
 import google.oauth2.credentials
 
 
@@ -25,7 +17,7 @@ def create_app():
 
     app.secret_key = SECRET_KEY
 
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:babyb00m@localhost:8080/postgres'
+    app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
 
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
@@ -34,11 +26,11 @@ def create_app():
     app.config['USER_ENABLE_USERNAME'] = True
     app.config['USER_REQUIRE_RETYPE_PASSWORD'] = False
 
-    app.config['MAIL_SERVER'] = 'smtp.gmail.com'
-    app.config['MAIL_PORT'] = 587
+    app.config['MAIL_SERVER'] = STMP_SERVER
+    app.config['MAIL_PORT'] = STMP_PORT
     app.config['MAIL_USE_TLS'] = True
-    app.config['MAIL_USERNAME'] = 'danishevchuk@gmail.com'  # Здесь указываете вашу почту
-    app.config['MAIL_PASSWORD'] = 'odqczelfissfcrro'  # Здесь указываете пароль от вашей почты
+    app.config['MAIL_USERNAME'] = STMP_USERNAME  # Здесь указываете вашу почту
+    app.config['MAIL_PASSWORD'] = STMP_PASSWORD  # Здесь указываете пароль от вашей почты
 
     db.init_app(app)
 
@@ -68,7 +60,7 @@ def revoke():
     credentials = google.oauth2.credentials.Credentials(
         **session['credentials'])
 
-    revoke = requests.post('https://oauth2.googleapis.com/revoke',
+    revoke = requests.post(REVOKE_TOKEN,
                            params={'token': credentials.token},
                            headers={'content-type': 'application/x-www-form-urlencoded'})
 

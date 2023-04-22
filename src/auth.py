@@ -7,11 +7,6 @@ from src.model import db, Users
 from flask_mail import Mail, Message
 import random
 
-# smtp_server = 'smtp.gmail.com'
-# smtp_port = 587
-# smtp_username = 'danishevchuk@gmail.com'  # Ваше имя пользователя Gmail
-# smtp_password = 'odqczelfissfcrro'  # Ваш пароль Gmail
-
 auth = Blueprint('auth', __name__, template_folder='../templates', static_folder='../static')
 
 login_manager = LoginManager()

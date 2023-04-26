@@ -1,9 +1,9 @@
 from flask_user import UserManager
-from src.Forms import RegisterForm, LoginForm
-from flask_login import LoginManager, login_user, current_user, logout_user
+from Forms import RegisterForm, LoginForm
+from flask_login import LoginManager, login_user, current_user, logout_user, login_required
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask import *
-from src.model import db, Users
+from model import db, Users
 from flask_mail import Mail, Message
 import random
 
@@ -118,7 +118,6 @@ def logout():
 @auth.route('/profile')
 def profile():
     if current_user.is_authenticated:
-        print(current_user.is_authenticated)
         return render_template('profile.html')
     else:
         return redirect(url_for('auth.login'))

@@ -1,7 +1,7 @@
 
 import flask
 from flask import *
-from src.auth import current_user
+from auth import current_user
 
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
@@ -9,8 +9,8 @@ from google_auth_oauthlib.flow import Flow
 from dropbox.exceptions import AuthError
 import dropbox
 
-from src.config import *
-from src.Oauth2_Connector import GoogleOauth2Connect, DropboxOauth2Connect
+from config import *
+from Oauth2_Connector import GoogleOauth2Connect, DropboxOauth2Connect
 
 
 photos = Blueprint('photos', __name__, template_folder='../templates', static_folder='../static')

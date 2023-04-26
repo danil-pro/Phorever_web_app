@@ -9,14 +9,12 @@ from dropbox.oauth import DropboxOAuth2Flow
 from dropbox.exceptions import AuthError
 from dropbox import files, sharing
 
-import src.config
+import config
 
-import datetime
+# import datetime
+#
+# import httplib2
 
-import httplib2
-
-
-config = src.config
 
 # GOOGLE_REDIRECT_URI = config.GOOGLE_REDIRECT_URI
 # app = flask.Flask(__name__)

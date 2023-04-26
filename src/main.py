@@ -1,15 +1,15 @@
-from src.auth import auth, init_login_app
-from src.url_photos_getters import photos
-from src.config import *
+from auth import auth, init_login_app
+from url_photos_getters import photos
+from config import *
 from flask import *
-from src.model import db
+from model import db
 from google.oauth2.credentials import Credentials
 import requests
 import google.oauth2.credentials
 
 
 def create_app():
-    app = Flask(__name__, template_folder='../templates')
+    app = Flask(__name__, template_folder='../templates', static_folder='../static')
 
     app.register_blueprint(photos, url_prefix='/photos')
 
@@ -33,14 +33,9 @@ def create_app():
     app.config['MAIL_PASSWORD'] = STMP_PASSWORD  # Здесь указываете пароль от вашей почты
 
     db.init_app(app)
-
+    with app.app_context():
+        db.create_all()
     init_login_app(app)
-    # user = Users.query.first()
-    # if user is not None:
-    #     user_password = '' if user_manager.USER_ENABLE_AUTH0 else user.password[-8:]
-    # UserManager(app, db, Users)
-    # migrate = Migrate(app, db)
-
     return app
 
 
@@ -50,6 +45,11 @@ app = create_app()
 @app.route('/')
 def index():
     return render_template('index.html')
+
+
+@app.route('/robot.txt')
+def static_from_root():
+    return send_from_directory(app.static_folder, 'robot.txt')
 
 
 @app.route('/revoke')
@@ -72,5 +72,4 @@ def revoke():
 
 
 if __name__ == '__main__':
-    db.create_all()
     app.run()

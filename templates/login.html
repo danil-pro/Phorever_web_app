@@ -17,5 +17,6 @@
     <label for="password">Password:</label>
     {{ form.password }}
     {{ form.submit }}
-</form>
+</form><br>
+    <a href="{{ url_for('auth.register') }}">Register</a>
 {% endblock %}

@@ -64,7 +64,9 @@ def google_photos():
         if 'credentials' not in session:
             return redirect(url_for('photos.google_authorize'))
         credentials = Credentials.from_authorized_user_info(session['credentials'])
+        print(credentials)
         base_url = google_auth.photos(credentials)
+        print(base_url)
         return render_template('img.html', base_url=base_url)
     return redirect(url_for('auth.login'))
 

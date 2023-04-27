@@ -47,10 +47,23 @@ class GoogleOauth2Connect:
         drive = build(self.api_service_name, self.api_version, credentials=credentials, static_discovery=False)
         base_url = []
         media_items = drive.mediaItems().list(pageSize=100).execute()
+        print(media_items)
         next_page_token = media_items.get('nextPageToken')
-        while next_page_token:
-            media_items = drive.mediaItems().list(pageSize=100, pageToken=next_page_token).execute()
-            next_page_token = media_items.get('nextPageToken')
+        print(next_page_token)
+        if next_page_token:
+            while next_page_token:
+                media_items = drive.mediaItems().list(pageSize=100, pageToken=next_page_token).execute()
+
+                next_page_token = media_items.get('nextPageToken')
+                data = media_items.get('mediaItems')
+                for i in data:
+                    media_meta_data = i.get('mediaMetadata')
+                    video = media_meta_data.get('video')
+                    if not video:
+                        base_url.append(i.get('baseUrl'))
+                    if len(base_url) > 30:
+                        break
+        else:
             data = media_items.get('mediaItems')
             for i in data:
                 media_meta_data = i.get('mediaMetadata')

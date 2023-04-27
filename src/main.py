@@ -47,6 +47,11 @@ def index():
     return render_template('index.html')
 
 
+@app.route('/googleb3f997e5d55f0443.html')
+def google_verif():
+    return render_template('googleb3f997e5d55f0443.html')
+
+
 @app.route('/robot.txt')
 def static_from_root():
     return send_from_directory(app.static_folder, 'robot.txt')

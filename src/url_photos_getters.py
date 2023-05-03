@@ -1,3 +1,7 @@
+import json
+import json
+import pickle
+# import os
 
 import flask
 from flask import *
@@ -12,6 +16,8 @@ import dropbox
 from config import *
 from Oauth2_Connector import GoogleOauth2Connect, DropboxOauth2Connect
 
+# from concurrent.futures import ThreadPoolExecutor
+# import asyncio
 
 photos = Blueprint('photos', __name__, template_folder='../templates', static_folder='../static')
 
@@ -58,16 +64,21 @@ def google_oauth2callback():
     return redirect(url_for('photos.google_photos'))
 
 
-@photos.route('/google_photos')
-def google_photos():
+@photos.route('/google_photos', methods=['GET'])
+async def google_photos():
     if current_user.is_authenticated:
         if 'credentials' not in session:
             return redirect(url_for('photos.google_authorize'))
-        credentials = Credentials.from_authorized_user_info(session['credentials'])
-        print(credentials)
-        base_url = google_auth.photos(credentials)
-        print(base_url)
-        return render_template('img.html', base_url=base_url)
+        # loop = asyncio.get_running_loop()
+        try:
+            credentials = Credentials.from_authorized_user_info(session['credentials'])
+            base_url = await google_auth.photos(credentials)
+            if not base_url:
+                flash('No photo', 'info')
+                return render_template('img.html')
+            return render_template('img.html', base_url=base_url)
+        except AuthError as e:
+            print(e)
     return redirect(url_for('auth.login'))
 
 
@@ -91,17 +102,18 @@ def dropbox_oauth2callback():
 
 
 @photos.route('/dropbox_photos')
-def dropbox_photos():
+async def dropbox_photos():
     if current_user.is_authenticated:
         if 'access_token' not in session:
             authorize_url = authenticator.start_auth()
             return flask.redirect(authorize_url)
         try:
             dbx = dropbox.Dropbox(session['access_token'])
-            base_url = authenticator.get_preview_urls(dbx)
-
+            base_url = await authenticator.get_all_preview_urls(dbx)
+            if not base_url:
+                flash('No photo', 'info')
+                return render_template('img.html')
             return render_template('img.html', base_url=base_url)
-
         except AuthError as e:
             print(e)
     return redirect(url_for('auth.login'))

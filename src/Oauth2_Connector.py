@@ -1,7 +1,12 @@
 # import flask
+import asyncio
+import json
 
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
+from google.auth.transport.requests import Request
+from google.auth.exceptions import RefreshError
+import aiohttp
 
 
 import dropbox
@@ -9,8 +14,11 @@ from dropbox.oauth import DropboxOAuth2Flow
 from dropbox.exceptions import AuthError
 from dropbox import files, sharing
 
+
 import config
 
+from concurrent.futures import ThreadPoolExecutor
+import httpx
 # import datetime
 #
 # import httplib2
@@ -43,36 +51,32 @@ class GoogleOauth2Connect:
                 'client_secret': credentials.client_secret,
                 'scopes': credentials.scopes}
 
-    def photos(self, credentials):
-        drive = build(self.api_service_name, self.api_version, credentials=credentials, static_discovery=False)
-        base_url = []
-        media_items = drive.mediaItems().list(pageSize=100).execute()
-        print(media_items)
-        next_page_token = media_items.get('nextPageToken')
-        print(next_page_token)
-        if next_page_token:
-            while next_page_token:
-                media_items = drive.mediaItems().list(pageSize=100, pageToken=next_page_token).execute()
+    async def photos(self, credentials):
+        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False)) as session:
+            base_url = []
+            next_page_token = None
 
-                next_page_token = media_items.get('nextPageToken')
-                data = media_items.get('mediaItems')
-                for i in data:
-                    media_meta_data = i.get('mediaMetadata')
-                    video = media_meta_data.get('video')
-                    if not video:
-                        base_url.append(i.get('baseUrl'))
-                    if len(base_url) > 30:
+            while True:
+                params = {'pageSize': 50}
+                if next_page_token:
+                    params['pageToken'] = next_page_token
+
+                async with session.get('https://photoslibrary.googleapis.com/v1/mediaItems',
+                                       headers={'Authorization': f'Bearer {credentials.token}'},
+                                       params=params) as response:
+                    data = await response.json()
+                    if not data:
+                        return None
+                    for item in data['mediaItems']:
+                        media_meta_data = item.get('mediaMetadata')
+                        video = media_meta_data.get('video')
+                        if not video:
+                            base_url.append(item.get('baseUrl'))
+
+                    next_page_token = data.get('nextPageToken')
+                    if not next_page_token:
                         break
-        else:
-            data = media_items.get('mediaItems')
-            for i in data:
-                media_meta_data = i.get('mediaMetadata')
-                video = media_meta_data.get('video')
-                if not video:
-                    base_url.append(i.get('baseUrl'))
-                if len(base_url) > 30:
-                    break
-        return base_url
+            return base_url
 
 
 class DropboxOauth2Connect:
@@ -110,26 +114,58 @@ class DropboxOauth2Connect:
         else:
             return None
 
-    def get_preview_urls(self, dbx):
-        result = dbx.files_list_folder("", recursive=True)
+    async def get_all_preview_urls(self, dbx):
+        # Получаем список файлов
+        files = await asyncio.to_thread(dbx.files_list_folder, '', recursive=True)
+        if not files:
+            return None
+        # Разбиваем список файлов на подсписки
+        chunks = [files.entries[i:i + 100] for i in range(0, len(files.entries), 100)]
+
+        # Запускаем получение ссылок на превью для каждого подсписка
+        # print(chunks)
+        tasks = []
+        for chunk in chunks:
+            print(chunk)
+            task = asyncio.create_task(self.get_preview_urls(dbx, chunk, files))
+            tasks.append(task)
+
+        # Получаем все ссылки на превью
         preview_urls = []
-        for entry in result.entries:
-            if isinstance(entry, dropbox.files.FileMetadata) and entry.name.lower().endswith(('.png', '.jpg', '.jpeg',
-                                                                                              '.gif', '.bmp')):
-                try:
-                    shared_links = dbx.sharing_list_shared_links(entry.id)
-                    if len(shared_links.links) > 0:
-                        preview_url = shared_links.links[0].url.replace("?dl=0", "?raw=1")
-                    else:
-                        settings = dropbox.sharing.SharedLinkSettings(
-                            requested_visibility=dropbox.sharing.RequestedVisibility.public)
-                        shared_link = dbx.sharing_create_shared_link_with_settings(entry.id, settings)
-                        preview_url = shared_link.url.replace("?dl=0", "?raw=1")
-                except Exception as e:
-                    print(e)
-                    preview_url = None
-                if preview_url:
-                    preview_urls.append(preview_url)
-                if len(preview_urls) > 10:
+        for result in await asyncio.gather(*tasks):
+            preview_urls.extend(result)
+
+        return preview_urls
+
+    async def get_preview_urls(self, dbx, chunk, files):
+        preview_urls = []
+        cursor = None
+        try:
+            while True:
+                if cursor:
+                    files = await asyncio.to_thread(dbx.files_list_folder_continue, cursor)
+                for entry in chunk:
+                    if isinstance(entry, dropbox.files.FileMetadata) and entry.name.lower().endswith(
+                            ('.png', '.jpg', '.jpeg', '.gif', '.bmp')):
+                        try:
+                            shared_links = dbx.sharing_get_shared_links(path=entry.path_display)
+                            if len(shared_links.links) > 0:
+                                preview_url = shared_links.links[0].url.replace("?dl=0", "?raw=1")
+                            else:
+                                settings = dropbox.sharing.SharedLinkSettings(
+                                    requested_visibility=dropbox.sharing.RequestedVisibility.public)
+                                shared_link = dbx.sharing_create_shared_link_with_settings(entry.id, settings)
+                                preview_url = shared_link.url.replace("?dl=0", "?raw=1")
+                        except Exception as e:
+                            print(e)
+                            preview_url = None
+                        if preview_url:
+                            preview_urls.append(preview_url)
+                        if len(preview_urls) > 100:
+                            break
+                if not files.has_more:
                     break
+                cursor = files.cursor
+        except Exception as e:
+            print(e)
         return preview_urls

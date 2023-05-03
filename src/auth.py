@@ -44,14 +44,12 @@ def register():
         if user:
             flash('Пользователь с таким адресом электронной почты уже зарегистрирован.')
             return redirect(url_for('auth.register'))
-        # verification_token = str(random.randint(100000, 999999))
         new_user = Users(email=form.email.data, password=password)
         new_user.verification_token = str(random.randint(100000, 999999))
         db.session.add(new_user)
         db.session.commit()
         send_verification_email(form.email.data)
         return redirect(url_for('auth.verify_email', email=form.email.data))
-        # return redirect(url_for('index'))
     return render_template('register.html', form=form)
 
 

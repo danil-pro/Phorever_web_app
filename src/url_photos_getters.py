@@ -75,10 +75,19 @@ async def google_photos():
             base_url = await google_auth.photos(credentials)
             if not base_url:
                 flash('No photo', 'info')
-                return render_template('img.html')
-            return render_template('img.html', base_url=base_url)
+                return render_template('img.html', source_function=url_for('photos.google_photos'))
+            return render_template('img.html', base_url=base_url, source_function=url_for('photos.google_photos'))
         except AuthError as e:
             print(e)
+    return redirect(url_for('auth.login'))
+
+
+@photos.route('/google_logout', methods=['GET'])
+def google_logout():
+    if current_user.is_authenticated:
+        if 'credentials' in session:
+            del session['credentials']
+            return flask.redirect(url_for('photos.google_authorize'))
     return redirect(url_for('auth.login'))
 
 
@@ -112,8 +121,19 @@ async def dropbox_photos():
             base_url = await authenticator.get_all_preview_urls(dbx)
             if not base_url:
                 flash('No photo', 'info')
-                return render_template('img.html')
-            return render_template('img.html', base_url=base_url)
+                return render_template('img.html', source_function=url_for('photos.dropbox_photos'))
+            return render_template('img.html', base_url=base_url, source_function=url_for('photos.dropbox_photos'))
         except AuthError as e:
             print(e)
     return redirect(url_for('auth.login'))
+
+
+@photos.route('/dropbox_logout')
+def dropbox_logout():
+    if current_user.is_authenticated:
+        if 'access_token' in session:
+            del session['access_token']
+            authorize_url = authenticator.start_auth()
+            return flask.redirect(authorize_url)
+    return redirect(url_for('auth.login'))
+

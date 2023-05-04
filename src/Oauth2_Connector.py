@@ -126,9 +126,9 @@ class DropboxOauth2Connect:
         # print(chunks)
         tasks = []
         for chunk in chunks:
-            print(chunk)
             task = asyncio.create_task(self.get_preview_urls(dbx, chunk, files))
             tasks.append(task)
+            break
 
         # Получаем все ссылки на превью
         preview_urls = []
@@ -161,11 +161,11 @@ class DropboxOauth2Connect:
                             preview_url = None
                         if preview_url:
                             preview_urls.append(preview_url)
-                        if len(preview_urls) > 100:
-                            break
                 if not files.has_more:
                     break
                 cursor = files.cursor
+                if len(preview_urls) > 100:
+                    break
         except Exception as e:
             print(e)
         return preview_urls

@@ -2,6 +2,11 @@
 
 {% block content %}
     <a href="{{ url_for('index') }}"><---Back</a><br>
+    {% if source_function == '/photos/google_photos'%}
+        <a href="{{ url_for('photos.google_logout') }}"> logout From Google</a><br>
+    {% else %}
+        <a href="{{ url_for('photos.dropbox_logout') }}"> logout From Dropbox</a><br>
+    {% endif %}
     {% with messages = get_flashed_messages() %}
         {% if messages %}
             {% for msg in messages %}

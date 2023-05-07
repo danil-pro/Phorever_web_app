@@ -3,7 +3,7 @@ from Forms import RegisterForm, LoginForm
 from flask_login import LoginManager, login_user, current_user, logout_user, login_required
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask import *
-from model import db, Users
+from model import db, Users, Photo
 from flask_mail import Mail, Message
 import random
 
@@ -116,10 +116,14 @@ def logout():
 @auth.route('/profile')
 def profile():
     if current_user.is_authenticated:
-        return render_template('profile.html')
+        photos = Photo.query.filter_by(user_id=current_user.id).all()
+        if photos:
+            photo_url = [photo.url for photo in photos]
+            return render_template('profile.html', photos=photo_url)
+        else:
+            flash('select photo', 'info')
     else:
         return redirect(url_for('auth.login'))
-
 
 # if __name__ == '__main__':
 #     app.run()

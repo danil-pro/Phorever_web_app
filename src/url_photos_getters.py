@@ -1,6 +1,3 @@
-import json
-import json
-import pickle
 # import os
 
 import flask
@@ -15,6 +12,7 @@ import dropbox
 
 from config import *
 from Oauth2_Connector import GoogleOauth2Connect, DropboxOauth2Connect
+from model import db, Photo
 
 # from concurrent.futures import ThreadPoolExecutor
 # import asyncio
@@ -58,10 +56,14 @@ def google_authorize():
 
 @photos.route('/google_oauth2callback')
 def google_oauth2callback():
-    state = session['state']
-    credentials = google_auth.build_credentials(request.url)
-    session['credentials'] = google_auth.credentials_to_dict(credentials)
-    return redirect(url_for('photos.google_photos'))
+    try:
+        state = session['state']
+        credentials = google_auth.build_credentials(request.url)
+        session['credentials'] = google_auth.credentials_to_dict(credentials)
+        return redirect(url_for('photos.google_photos'))
+    except Exception as e:
+        print(e)
+        return redirect(url_for('index'))
 
 
 @photos.route('/google_photos', methods=['GET'])
@@ -103,10 +105,10 @@ def dropbox_authorize():
 def dropbox_oauth2callback():
     try:
         session['access_token'], session['user_id'] = authenticator.finish_auth(request.args)
-
-    except AuthError as e:
+        print(session)
+    except Exception as e:
         print(e)
-        return redirect(url_for('photos.dropbox_authorize'))
+        return redirect(url_for('index'))
     return redirect(url_for('photos.dropbox_photos'))
 
 
@@ -132,8 +134,24 @@ async def dropbox_photos():
 def dropbox_logout():
     if current_user.is_authenticated:
         if 'access_token' in session:
-            del session['access_token']
+            del session['access_token'], session['user_id']
+            print(session)
+            session.modified = True
             authorize_url = authenticator.start_auth()
             return flask.redirect(authorize_url)
     return redirect(url_for('auth.login'))
 
+
+@photos.route('/add_photo', methods=['GET', 'POST'])
+def add_photo():
+    if current_user.is_authenticated:
+        if request.method == 'POST':
+            # Получаем список URL-адресов фотографий из формы
+            urls = request.form.getlist('selected_photos')
+            # Добавляем каждую фотографию в БД
+            for url in urls:
+                photo = Photo(url=url, user_id=current_user.id)
+                db.session.add(photo)
+            db.session.commit()
+            return redirect(url_for('auth.profile'))
+    return redirect(url_for('auth.login'))

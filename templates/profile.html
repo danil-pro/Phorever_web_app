@@ -9,4 +9,7 @@
         {% endif %}
     {% endwith %}
     <a href='{{ url_for('auth.logout') }}'>Logout</a><br>
+    {% for i in photos %}
+        <img src="{{ i }}" alt="" width="100px" height="100px">
+    {% endfor %}
 {% endblock %}

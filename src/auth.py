@@ -6,6 +6,7 @@ from flask import *
 from model import db, Users, Photo
 from flask_mail import Mail, Message
 import random
+import requests
 
 auth = Blueprint('auth', __name__, template_folder='../templates', static_folder='../static')
 
@@ -24,7 +25,6 @@ def send_verification_email(email):
     msg = Message('Verification Code', sender='danishevchuk@gmail.com', recipients=[email])
     msg.body = f'Your verification code is: {user.verification_token}'
     mail.send(msg)
-    # verification_url = url_for('auth.verify_email', email=email, _external=True)
 
 
 @login_manager.user_loader
@@ -105,23 +105,13 @@ def login():
 def logout():
     if current_user.is_authenticated:
         logout_user()
-        session.clear()
-        if 'credentials' in session:
-            del session['credentials']
-        if 'access_token' in session:
-            del session['access_token']
     return redirect(url_for('auth.login'))
 
 
 @auth.route('/profile')
 def profile():
     if current_user.is_authenticated:
-        photos = Photo.query.filter_by(user_id=current_user.id).all()
-        if photos:
-            photo_url = [photo.url for photo in photos]
-            return render_template('profile.html', photos=photo_url)
-        else:
-            flash('select photo', 'info')
+        return render_template('profile.html')
     else:
         return redirect(url_for('auth.login'))
 

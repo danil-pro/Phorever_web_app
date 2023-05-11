@@ -53,11 +53,11 @@ class GoogleOauth2Connect:
 
     async def photos(self, credentials):
         async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False)) as session:
-            base_url = []
+            photos_data = []
             next_page_token = None
 
             while True:
-                params = {'pageSize': 50}
+                params = {'pageSize': 100}
                 if next_page_token:
                     params['pageToken'] = next_page_token
 
@@ -71,12 +71,15 @@ class GoogleOauth2Connect:
                         media_meta_data = item.get('mediaMetadata')
                         video = media_meta_data.get('video')
                         if not video:
-                            base_url.append(item.get('baseUrl'))
+                            photo_data = {}
+                            photo_data['baseUrl'] = item.get('baseUrl')
+                            photo_data['photoId'] = item.get('id')
+                            photos_data.append(photo_data)
 
                     next_page_token = data.get('nextPageToken')
                     if not next_page_token:
                         break
-            return base_url
+            return photos_data
 
 
 class DropboxOauth2Connect:

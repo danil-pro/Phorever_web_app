@@ -1,0 +1,24 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for msg in messages %}
+                <p>{{ msg }}</p>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    <h1>Your Photo</h1><br>
+    {% if photos %}
+        <h2>Select more photos from services:</h2><br>
+        <a href="{{ url_for('photos.google_photos') }}"> Google Photo</a>
+        <a href="{{ url_for('photos.dropbox_photos') }}"> Dropbox</a><br>
+        {% for i in photos %}
+            <img src="{{ i }}" alt="" width="100px" height="100px">
+        {% endfor %}
+    {% else %}
+        <h2>Please select a photo from the offered services</h2><br>
+        <a href="{{ url_for('photos.google_photos') }}"> Google Photo</a>
+        <a href="{{ url_for('photos.dropbox_photos') }}"> Dropbox</a><br>
+    {% endif %}
+{% endblock %}

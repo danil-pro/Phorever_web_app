@@ -6,6 +6,7 @@ from auth import current_user
 
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
+from googleapiclient.discovery import build
 
 from dropbox.exceptions import AuthError
 import dropbox
@@ -14,13 +15,16 @@ from config import *
 from Oauth2_Connector import GoogleOauth2Connect, DropboxOauth2Connect
 from model import db, Photo
 
+# import requests
+import aiohttp
+import json
+
 # from concurrent.futures import ThreadPoolExecutor
 # import asyncio
 
 photos = Blueprint('photos', __name__, template_folder='../templates', static_folder='../static')
 
 CLIENT_SECRETS_FILE = CLIENT_SECRETS_FILE
-
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
 
@@ -60,7 +64,7 @@ def google_oauth2callback():
         state = session['state']
         credentials = google_auth.build_credentials(request.url)
         session['credentials'] = google_auth.credentials_to_dict(credentials)
-        return redirect(url_for('photos.google_photos'))
+        return redirect(url_for('photos.user_photos'))
     except Exception as e:
         print(e)
         return redirect(url_for('index'))
@@ -74,11 +78,16 @@ async def google_photos():
         # loop = asyncio.get_running_loop()
         try:
             credentials = Credentials.from_authorized_user_info(session['credentials'])
-            base_url = await google_auth.photos(credentials)
-            if not base_url:
+            photos_data = await google_auth.photos(credentials)
+            user_photo_ids = [photo.google_photo_id for photo in Photo.query.filter().all()]
+            if not photos_data:
                 flash('No photo', 'info')
                 return render_template('img.html', source_function=url_for('photos.google_photos'))
-            return render_template('img.html', base_url=base_url, source_function=url_for('photos.google_photos'))
+            for user_photo_id in user_photo_ids:
+                for data in photos_data:
+                    if user_photo_id == data['photoId']:
+                        photos_data.remove(data)
+            return render_template('img.html', base_url=photos_data, source_function=url_for('photos.google_photos'))
         except AuthError as e:
             print(e)
     return redirect(url_for('auth.login'))
@@ -146,12 +155,42 @@ def dropbox_logout():
 def add_photo():
     if current_user.is_authenticated:
         if request.method == 'POST':
-            # Получаем список URL-адресов фотографий из формы
-            urls = request.form.getlist('selected_photos')
-            # Добавляем каждую фотографию в БД
-            for url in urls:
-                photo = Photo(url=url, user_id=current_user.id)
+            photos_data = request.form.getlist('selected_photos')
+            source_function = request.form.get('source_function')
+
+            for photo_data in photos_data:
+                photo = Photo(photos_data=photo_data, service=source_function, user_id=current_user.id)
                 db.session.add(photo)
             db.session.commit()
-            return redirect(url_for('auth.profile'))
+            return redirect(url_for('photos.user_photos'))
     return redirect(url_for('auth.login'))
+
+
+@photos.route('/user_photos', methods=['GET', 'POST'])
+def user_photos():
+    if current_user.is_authenticated:
+        if 'credentials' not in session:
+            return redirect(url_for('photos.google_authorize'))
+        photos = Photo.query.filter_by(user_id=current_user.id).all()
+
+        photo_url = []
+        if photos:
+            google_photo_ids = [photo.photos_data for photo in photos if photo.service == '/photos/google_photos']
+            dropbox_photos_urls = [photo.photos_data for photo in photos if photo.service == '/photos/dropbox_photos']
+            if google_photo_ids:
+                drive = build(serviceName=API_SERVICE_NAME,
+                              version=API_VERSION,
+                              credentials=Credentials.from_authorized_user_info(session['credentials']),
+                              static_discovery=False)
+                for i in range(0, len(google_photo_ids), 50):
+                    chunk = google_photo_ids[i:i + 50]
+                    response = drive.mediaItems().batchGet(mediaItemIds=chunk).execute()
+                    for items in response['mediaItemResults']:
+                        media_item = items['mediaItem']
+                        photo_url.append(media_item['baseUrl'])
+            if dropbox_photos_urls:
+                for url in dropbox_photos_urls:
+                    photo_url.append(url)
+        return render_template('user_photo.html', photos=photo_url)
+    else:
+        return redirect(url_for('auth.login'))

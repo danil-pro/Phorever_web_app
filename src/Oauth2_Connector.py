@@ -51,36 +51,42 @@ class GoogleOauth2Connect:
                 'client_secret': credentials.client_secret,
                 'scopes': credentials.scopes}
 
-    async def photos(self, credentials):
-        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False)) as session:
-            photos_data = []
-            next_page_token = None
+    def photos(self, credentials, album_title='test'):
+        service = build(self.api_service_name, self.api_version, credentials=credentials, static_discovery=False)
+        # Получаем список всех общих альбомов
+        shared_albums = []
+        page_token = ""
+        while page_token is not None:
+            results = service.sharedAlbums().list(pageToken=page_token).execute()
+            shared_albums.extend(results.get("sharedAlbums", []))
+            page_token = results.get("nextPageToken", None)
 
-            while True:
-                params = {'pageSize': 100}
-                if next_page_token:
-                    params['pageToken'] = next_page_token
+        # Ищем альбом с заданным названием
+        album_id = None
+        for album in shared_albums:
+            if album["title"] == album_title:
+                album_id = album["id"]
+                break
 
-                async with session.get('https://photoslibrary.googleapis.com/v1/mediaItems',
-                                       headers={'Authorization': f'Bearer {credentials.token}'},
-                                       params=params) as response:
-                    data = await response.json()
-                    if not data:
-                        return None
-                    for item in data['mediaItems']:
-                        media_meta_data = item.get('mediaMetadata')
-                        video = media_meta_data.get('video')
-                        if not video:
-                            photo_data = {}
-                            photo_data['baseUrl'] = item.get('baseUrl')
-                            photo_data['photoId'] = item.get('id')
-                            photos_data.append(photo_data)
+        # Если альбом не найден, возвращаем None
+        if album_id is None:
+            return None
 
-                    next_page_token = data.get('nextPageToken')
-                    if not next_page_token:
-                        break
-            return photos_data
+        # Получаем все фотографии из альбома
+        photos_data = []
+        page_token = ""
+        while page_token is not None:
+            results = service.mediaItems().search(body={"albumId": album_id, "pageToken": page_token}).execute()
+            items = results.get("mediaItems", [])
+            for item in items:
+                if "video" not in item.get("mimeType"):
+                    photo_data = {}
+                    photo_data["baseUrl"] = item["baseUrl"]
+                    photo_data["photoId"] = item["id"]
+                    photos_data.append(photo_data)
+            page_token = results.get("nextPageToken", None)
 
+        return photos_data
 
 class DropboxOauth2Connect:
     def __init__(self, app_key, app_secret, redirect_uri, session):

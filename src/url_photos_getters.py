@@ -71,15 +71,16 @@ def google_oauth2callback():
 
 
 @photos.route('/google_photos', methods=['GET'])
-async def google_photos():
+def google_photos():
     if current_user.is_authenticated:
         if 'credentials' not in session:
             return redirect(url_for('photos.google_authorize'))
         # loop = asyncio.get_running_loop()
         try:
             credentials = Credentials.from_authorized_user_info(session['credentials'])
-            photos_data = await google_auth.photos(credentials)
-            user_photo_ids = [photo.google_photo_id for photo in Photo.query.filter().all()]
+            photos_data = google_auth.photos(credentials)
+            user_photo_ids = [photo.photos_data for photo in Photo.query.filter().all()
+                              if photo.service == '/photos/google_photos']
             if not photos_data:
                 flash('No photo', 'info')
                 return render_template('img.html', source_function=url_for('photos.google_photos'))

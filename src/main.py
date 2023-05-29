@@ -47,6 +47,12 @@ def index():
     return render_template('index.html')
 
 
+@app.route('/session_clear')
+def session_clear():
+    session.clear()
+    return redirect(url_for('index'))
+
+
 @app.route('/googleb3f997e5d55f0443.html')
 def google_verif():
     return render_template('googleb3f997e5d55f0443.html')

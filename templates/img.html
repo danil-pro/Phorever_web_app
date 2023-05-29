@@ -11,7 +11,6 @@
     <a href="{{ url_for('index') }}"><---Back</a><br>
     {% if source_function == '/photos/google_photos'%}
         <h1 class="google">Photos from google photos</h1>
-        <a href="{{ url_for('photos.google_logout') }}"> logout From Google</a><br>
         {% if base_url %}
             <form action="{{url_for('photos.add_photo')}}" method="post">
               <input type="hidden" name="source_function" value="{{ source_function }}">

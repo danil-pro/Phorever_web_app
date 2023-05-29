@@ -3,9 +3,10 @@ from Forms import RegisterForm, LoginForm
 from flask_login import LoginManager, login_user, current_user, logout_user, login_required
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask import *
-from model import db, Users, Photo
+from model import db, Users
 from flask_mail import Mail, Message
 import random
+import string
 import requests
 
 auth = Blueprint('auth', __name__, template_folder='../templates', static_folder='../static')
@@ -20,10 +21,9 @@ def init_login_app(app):
     UserManager(app, db, Users)
 
 
-def send_verification_email(email):
-    user = load_user(email)
-    msg = Message('Verification Code', sender='danishevchuk@gmail.com', recipients=[email])
-    msg.body = f'Your verification code is: {user.verification_token}'
+def send_email(email, message, body):
+    msg = Message(message, sender='danishevchuk@gmail.com', recipients=[email])
+    msg.body = body
     mail.send(msg)
 
 
@@ -33,8 +33,9 @@ def load_user(email):
     return Users.query.filter_by(email=email).first()
 
 
+@auth.route('/register/<parent_token>', methods=['GET', 'POST'])
 @auth.route('/register', methods=['GET', 'POST'])
-def register():
+def register(parent_token=None):
     if current_user.is_authenticated:
         return redirect(url_for('auth.profile'))
     form = RegisterForm(request.form)
@@ -46,35 +47,54 @@ def register():
             return redirect(url_for('auth.register'))
         new_user = Users(email=form.email.data, password=password)
         new_user.verification_token = str(random.randint(100000, 999999))
+        parent_token = request.form.get('parent_token')
+        if parent_token == 'None':
+            new_user.parent_id = None
+        else:
+            parent_user = Users.query.filter_by(parent_token=parent_token).first()
+            if not parent_user:
+                flash('The user who invited you does not exist')
+                return redirect(url_for('auth.register'))
+            if parent_user.parent_id:
+                new_user.parent_id = parent_user.parent_id
+            else:
+                new_user.parent_id = parent_user.id
+        new_user.parent_token = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
+        new_user.token = None
+        new_user.refresh_token = None
         db.session.add(new_user)
         db.session.commit()
-        send_verification_email(form.email.data)
-        return redirect(url_for('auth.verify_email', email=form.email.data))
-    return render_template('register.html', form=form)
+        send_email(form.email.data, '', f'''Для подтверждения своей электронной почты, пожалуйста, посетите следующую ссылку:
+    {url_for('auth.verify_email', email=form.email.data, token=new_user.verification_token, _external=True)}
+    Если вы не запрашивали подтверждение своей электронной почты, то просто проигнорируйте это сообщение.
+    ''')
+        return render_template('verification.html')
+    return render_template('register.html', form=form, parent_token=parent_token)
 
 
-@auth.route('/verify-email/<email>', methods=['GET', 'POST'])
-def verify_email(email):
+@auth.route('/verify-email/<email>/<token>', methods=['GET', 'POST'])
+def verify_email(email, token):
     try:
-        if request.method == 'POST':
-            user = load_user(email)
-            entered_code = request.form['verification_code']
-            verification_code = user.verification_token
-            if entered_code == verification_code:
-                if user and user.is_verified:
-                    flash('Ваша электронная почта уже была подтверждена.')
-                else:
-                    user.is_verified = True
-                    db.session.add(user)
-                    db.session.commit()
-                    flash('Ваша электронная почта была успешно подтверждена.')
-                    return redirect(url_for('auth.login'))
+        user = load_user(email)
+        verification_code = user.verification_token
+        if token == verification_code:
+            if user and user.is_verified:
+                flash('Ваша электронная почта уже была подтверждена.')
+                return redirect(url_for('index'))
             else:
-                print('err')
+                user.is_verified = True
+                if user.parent_id is None:
+                    user.parent_id = user.id
+                db.session.add(user)
+                db.session.commit()
+                flash('Ваша электронная почта была успешно подтверждена.')
+                return redirect(url_for('auth.login'))
+        else:
+            print('err')
     except:
         flash('Неверный токен верификации.')
         return redirect(url_for('auth.verify_email'))
-    return render_template('verification.html', email=email)
+    return redirect(url_for('auth.login'))
 
 
 @auth.route('/login', methods=['GET', 'POST'])
@@ -108,9 +128,14 @@ def logout():
     return redirect(url_for('auth.login'))
 
 
-@auth.route('/profile')
+@auth.route('/profile', methods=['GET', 'POST'])
 def profile():
     if current_user.is_authenticated:
+        if request.method == 'POST':
+            invite = request.form['invite']
+            send_email(invite, f'Invite to Phorever from {current_user.email}',
+                       f"{url_for('auth.register', parent_token=current_user.parent_token,  _external=True)}")
+            flash('The invitation has been sent')
         return render_template('profile.html')
     else:
         return redirect(url_for('auth.login'))

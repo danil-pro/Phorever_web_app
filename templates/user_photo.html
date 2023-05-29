@@ -8,13 +8,24 @@
             {% endfor %}
         {% endif %}
     {% endwith %}
+    <a href="{{ url_for('index') }}"><---back</a>
     <h1>Your Photo</h1><br>
     {% if photos %}
         <h2>Select more photos from services:</h2><br>
         <a href="{{ url_for('photos.google_photos') }}"> Google Photo</a>
         <a href="{{ url_for('photos.dropbox_photos') }}"> Dropbox</a><br>
-        {% for i in photos %}
-            <img src="{{ i }}" alt="" width="100px" height="100px">
+        {% for email, urls in photos.items() %}
+            <h3>Photo upload by : {{ email }}</h3><br>
+            <hr>
+            {% if urls %}
+                {% for url in urls %}
+    {#                <p>{{ url }}</p>#}
+                    <img src="{{ url }}" alt="Photo from {{ email }}" width="100px" height="100px">
+                {% endfor %}
+            {% else %}
+                <h3>No photos</h3>
+                <hr>
+            {% endif %}
         {% endfor %}
     {% else %}
         <h2>Please select a photo from the offered services</h2><br>

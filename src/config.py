@@ -4,7 +4,9 @@ from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv())
 
 CLIENT_SECRETS_FILE = os.environ.get('CLIENT_SECRETS_FILE')
-SCOPES = os.environ.get('SCOPES')
+SCOPE1 = os.environ.get('SCOPE1')
+SCOPE2 = os.environ.get('SCOPE2')
+SCOPE3 = os.environ.get('SCOPE3')
 API_SERVICE_NAME = os.environ.get('API_SERVICE_NAME')
 API_VERSION = os.environ.get('API_VERSION')
 APP_KEY = os.environ.get('APP_KEY')

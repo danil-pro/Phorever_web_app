@@ -9,7 +9,12 @@
         {% endif %}
     {% endwith %}
     <a href='{{ url_for('auth.logout') }}'>Logout</a><br>
-    {% for i in photos %}
-        <img src="{{ i }}" alt="" width="100px" height="100px">
-    {% endfor %}
+    <form method="POST" action="{{ url_for('auth.profile') }}">
+        <h3>invite to Phorever</h3><br>
+        <p>Write the email of the person you want to add to Phorever</p><br>
+        <label for=""><input type="text" name="invite" ></label>
+        <label for=""><input type="submit" value="submit"></label>
+    </form>
+
+
 {% endblock %}

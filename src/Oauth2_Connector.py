@@ -6,19 +6,21 @@ from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
 from google.auth.exceptions import RefreshError
+from googleapiclient.errors import HttpError
+# from google.api_core.page_iterator_async import AsyncGRPCIterator
 import aiohttp
-
 
 import dropbox
 from dropbox.oauth import DropboxOAuth2Flow
 from dropbox.exceptions import AuthError
 from dropbox import files, sharing
 
-
 import config
 
 from concurrent.futures import ThreadPoolExecutor
 import httpx
+
+
 # import datetime
 #
 # import httplib2
@@ -51,42 +53,95 @@ class GoogleOauth2Connect:
                 'client_secret': credentials.client_secret,
                 'scopes': credentials.scopes}
 
-    def photos(self, credentials, album_title='test'):
+    def photos(self, credentials):
+        photos_data = []
+        try:
+            service = build(self.api_service_name, self.api_version, credentials=credentials, static_discovery=False)
+            next_page_token = ''
+            while next_page_token is not None:
+                results = service.mediaItems().list(
+                    pageSize=100,
+                    pageToken=next_page_token,
+                    fields='nextPageToken,mediaItems(id,baseUrl,mediaMetadata)'
+                ).execute()
+                items = results.get('mediaItems', [])
+                for item in items:
+                    media_meta_data = item.get('mediaMetadata')
+                    video = media_meta_data.get('video')
+                    if not video:
+                        photo_data = {'baseUrl': item.get('baseUrl'), 'photoId': item.get('id')}
+                        photos_data.append(photo_data)
+                next_page_token = results.get('nextPageToken')
+        except HttpError as error:
+            print(f"An error occurred: {error}")
+        return photos_data
+
+    def get_albums_data(self, credentials, album_id):
         service = build(self.api_service_name, self.api_version, credentials=credentials, static_discovery=False)
-        # Получаем список всех общих альбомов
-        shared_albums = []
-        page_token = ""
-        while page_token is not None:
-            results = service.sharedAlbums().list(pageToken=page_token).execute()
-            shared_albums.extend(results.get("sharedAlbums", []))
-            page_token = results.get("nextPageToken", None)
 
-        # Ищем альбом с заданным названием
-        album_id = None
-        for album in shared_albums:
-            if album["title"] == album_title:
-                album_id = album["id"]
-                break
+        photos = service.mediaItems().search(body={'albumId': album_id}).execute()
+        product_url = service.albums().get(albumId=album_id).execute()
+        photo_data = []
+        if 'mediaItems' in photos:
+            for photo in photos['mediaItems']:
+                base_url = photo['baseUrl']
+                photo_data.append(base_url)
+        photo_data.append(product_url['productUrl'])
 
-        # Если альбом не найден, возвращаем None
-        if album_id is None:
+        return photo_data
+
+    def get_albums(self, credentials, album_id):
+        try:
+            service = build(self.api_service_name, self.api_version, credentials=credentials, static_discovery=False)
+            title_list = []
+            for i in album_id:
+                try:
+                    list_shared_albums = service.albums().get(albumId=i).execute()
+                    album_data = {'title': list_shared_albums.get('title'),
+                                  'id': list_shared_albums.get('id'),
+                                  'productUrl': list_shared_albums.get('productUrl'),
+                                  'shareableUrl': list_shared_albums.get('shareableUrl')}
+                    title_list.append(album_data)
+                except HttpError as error:
+                    if error.resp.status == 404:
+                        print(f"Альбом с ID '{i}' не найден.")
+                        continue
+                    else:
+                        raise error
+            return title_list
+        except Exception as e:
+            print(str(e))
             return None
 
-        # Получаем все фотографии из альбома
-        photos_data = []
-        page_token = ""
-        while page_token is not None:
-            results = service.mediaItems().search(body={"albumId": album_id, "pageToken": page_token}).execute()
-            items = results.get("mediaItems", [])
-            for item in items:
-                if "video" not in item.get("mimeType"):
-                    photo_data = {}
-                    photo_data["baseUrl"] = item["baseUrl"]
-                    photo_data["photoId"] = item["id"]
-                    photos_data.append(photo_data)
-            page_token = results.get("nextPageToken", None)
+    def create_shared_album(self, credentials, title='Phorever'):
+        # Set album parameters
+        service = build(self.api_service_name, self.api_version, credentials=credentials, static_discovery=False)
+        album_body = {
+            'album': {
+                'title': title,
+                'shareInfo': {
+                    'sharedAlbumOptions': {
+                        'isCollaborative': True,
+                        'isCommentable': True
+                    }
+                }
+            }
+        }
+        created_album = service.albums().create(body=album_body).execute()
+        service.albums().share(albumId=created_album['id'], body={
+            'sharedAlbumOptions': {
+                'isCollaborative': True,
+                'isCommentable': True
+            }}).execute()
+        return created_album['id']
 
-        return photos_data
+    def add_photos_to_album(self, credentials, album_id, photo_ids):
+        service = build(self.api_service_name, self.api_version, credentials=credentials, static_discovery=False)
+
+        response = service.albums().batchAddMediaItems(albumId=album_id, body={"mediaItemIds": photo_ids}).execute()
+
+        return response
+
 
 class DropboxOauth2Connect:
     def __init__(self, app_key, app_secret, redirect_uri, session):

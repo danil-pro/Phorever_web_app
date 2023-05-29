@@ -9,7 +9,6 @@
         {% endif %}
     {% endwith %}
     <form method="POST" action="{{ url_for('auth.register') }}">
-      {{ form.csrf_token }}
       <p>
         <label>Email:</label>
         {{ form.email() }}
@@ -22,6 +21,8 @@
         <label>Confirm Password:</label>
         {{ form.confirm_password() }}
       </p>
+        {{ form.hidden_tag() }}
+            <input type="hidden" name="parent_token" value="{{ parent_token }}">
       <p>
         {{ form.submit() }}
       </p>

@@ -1,4 +1,4 @@
-# import os
+import os
 
 import flask
 from flask import *
@@ -13,7 +13,7 @@ import dropbox
 
 from config import *
 from Oauth2_Connector import GoogleOauth2Connect, DropboxOauth2Connect
-from model import db, Photos, Users
+from model import db, Photos, Users, PhotosMetaData
 from Worker import Worker
 
 # import requests
@@ -24,8 +24,12 @@ import json
 # import asyncio
 
 photos = Blueprint('photos', __name__, template_folder='../templates', static_folder='../static')
+current_dir = os.path.dirname(os.path.abspath(__file__))
 
 CLIENT_SECRETS_FILE = CLIENT_SECRETS_FILE
+
+absolute_path = os.path.join(current_dir, CLIENT_SECRETS_FILE)
+print(absolute_path)
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
 
@@ -67,12 +71,6 @@ def google_oauth2callback():
         state = session['state']
         credentials = google_auth.build_credentials(request.url)
         session['credentials'] = google_auth.credentials_to_dict(credentials)
-        user = Users.query.filter_by(id=current_user.id).first()
-        if not user.refresh_token:
-            user.refresh_token = session['credentials'].get('refresh_token')
-            user.token = session['credentials'].get('token')
-            db.session.add(user)
-            db.session.commit()
 
         return redirect(url_for('photos.user_photos'))
     except Exception as e:
@@ -112,7 +110,8 @@ def add_photo():
             source_function = request.form.get('source_function')
 
             for photo_data in photos_data:
-                photo = Photos(photos_data=photo_data, service=source_function, user_id=current_user.id)
+                photo = Photos(photos_data=photo_data, service=source_function, token=session['credentials']['token'],
+                               refresh_token=session['credentials']['refresh_token'], user_id=current_user.id)
                 db.session.add(photo)
             db.session.commit()
             return redirect(url_for('photos.user_photos'))
@@ -182,33 +181,71 @@ def user_photos():
     if current_user.is_authenticated:
         if 'credentials' not in session:
             return redirect(url_for('photos.google_authorize'))
-        current_user_photos = Photos.query.filter_by(user_id=current_user.id).all()
-        parent_photos = Photos.query.filter_by(user_id=current_user.parent_id).all()
-        parent_user = Users.query.filter_by(id=current_user.parent_id).first()
         current_user_family = Users.query.filter_by(parent_id=current_user.parent_id).all()
-        user = Users.query.filter_by(id=current_user.id).first()
-        photo_url = {}
+        photo_url = []
 
         for family_user in current_user_family:
-            session['credentials']['refresh_token'] = family_user.refresh_token
-            session['credentials']['token'] = family_user.token
-            print(family_user.id)
             family_user_photos = Photos.query.filter_by(user_id=family_user.id).all()
-            photo_urls = worker.get_photos_from_db(family_user_photos, session['credentials'])
-            photo_url.setdefault(family_user.email, []).extend(photo_urls)
-        #
-        # if current_user_photos:
-        #     photo_urls = worker.get_photos_from_db(current_user_photos, session['credentials'])
-        #     photo_url.setdefault(user.email, []).extend(photo_urls)
-        # if parent_user:
-        #     if parent_photos:
-        #         session['credentials']['refresh_token'] = parent_user.refresh_token
-        #         session['credentials']['token'] = parent_user.token
-        #         photo_urls = worker.get_photos_from_db(parent_photos, session['credentials'])
-        #         photo_url.setdefault(parent_user.email, []).extend(photo_urls)
-
-            session['credentials']['refresh_token'] = user.refresh_token
-            session['credentials']['token'] = user.token
-        return render_template('user_photo.html', photos=photo_url)
+            correct_family_user_photos = []
+            for photo in family_user_photos:
+                photos_meta_data = PhotosMetaData.query.filter_by(photo_id=photo.id).first()
+                if not photos_meta_data:
+                    correct_family_user_photos.append(photo)
+            photo_urls = worker.get_photos_from_db(correct_family_user_photos, session['credentials'])
+            dict_photo_data = {family_user.email: photo_urls}
+            photo_url.append(dict_photo_data)
+        return render_template('user_photo.html', photos=photo_url, parent_id=current_user.parent_id)
     else:
         return redirect(url_for('auth.login'))
+
+
+@photos.route('/add_photo_description/<photo_id>', methods=['GET', 'POST'])
+def add_photo_description(photo_id):
+    if current_user.is_authenticated:
+        if 'credentials' not in session:
+            return redirect(url_for('photos.google_authorize'))
+        photo = Photos.query.filter_by(id=photo_id).first()
+        photo_urls = worker.get_photo_data_from_db(photo, session['credentials'])
+        photo_meta_data = PhotosMetaData.query.filter_by(photo_id=photo_id).first()
+        if request.method == "POST":
+            title = request.form['title']
+            description = request.form['description']
+            location = request.form['location']
+            creation_data = request.form['creation_data']
+            if not photo_meta_data:
+                new_photo_meta_data = PhotosMetaData(title=title,
+                                                     description=description,
+                                                     location=location,
+                                                     creation_data=creation_data, photo_id=photo_id)
+                db.session.add(new_photo_meta_data)
+                db.session.commit()
+                return redirect(url_for('photos.user_photos'))
+            else:
+                if title:
+                    photo_meta_data.title = title
+                if description:
+                    photo_meta_data.description = description
+                if location:
+                    photo_meta_data.location = location
+                if creation_data:
+                    photo_meta_data.creation_data = creation_data
+
+                db.session.commit()
+                return redirect(url_for('photos.user_photos'))
+
+        return render_template('add_photo_description.html', photo_urls=photo_urls, photo_id=photo_id)
+    else:
+        return redirect(url_for('auth.login'))
+
+
+@photos.route('/photos_tree/<parent_id>', methods=['GET', 'POST'])
+def photos_tree(parent_id):
+    if current_user.is_authenticated:
+        if 'credentials' not in session:
+            return redirect(url_for('photos.google_authorize'))
+
+
+    else:
+        return redirect(url_for('auth.login'))
+
+

@@ -12,8 +12,8 @@ class Users(db.Model, UserMixin):
     verification_token = db.Column(db.String(10), unique=True, nullable=True)
     parent_token = db.Column(db.String(10), nullable=True)
     parent_id = db.Column(db.Integer, nullable=True)
-    token = db.Column(db.String(300), nullable=True)
-    refresh_token = db.Column(db.String(300), nullable=True)
+    # token = db.Column(db.String(300), nullable=True)
+    # refresh_token = db.Column(db.String(300), nullable=True)
 
     def __init__(self, email, password):
         self.email = email
@@ -23,16 +23,21 @@ class Users(db.Model, UserMixin):
         return hasattr(self, 'is_verified') and self.is_authenticated
 
 
-# class Albums(db.Model):
-#     id = db.Column(db.Integer, primary_key=True)
-#     album_id = db.Column(db.String(100), nullable=False)
-#     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+class PhotosMetaData(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(100), nullable=True)
+    description = db.Column(db.String(10000), nullable=True)
+    location = db.Column(db.String(1000), nullable=True)
+    creation_data = db.Column(db.String(10), nullable=True)
+    photo_id = db.Column(db.Integer, db.ForeignKey('photos.id'), nullable=False)
 
 
 class Photos(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     photos_data = db.Column(db.String(200000), nullable=False)
     service = db.Column(db.String(32), nullable=False)
+    token = db.Column(db.String(300), nullable=True)
+    refresh_token = db.Column(db.String(300), nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
 
     def __repr__(self):

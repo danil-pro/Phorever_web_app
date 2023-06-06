@@ -13,19 +13,23 @@
     {% if photos %}
         <h2>Select more photos from services:</h2><br>
         <a href="{{ url_for('photos.google_photos') }}"> Google Photo</a>
-        <a href="{{ url_for('photos.dropbox_photos') }}"> Dropbox</a><br>
-        {% for email, urls in photos.items() %}
-            <h3>Photo upload by : {{ email }}</h3><br>
-            <hr>
-            {% if urls %}
-                {% for url in urls %}
-    {#                <p>{{ url }}</p>#}
-                    <img src="{{ url }}" alt="Photo from {{ email }}" width="100px" height="100px">
+        <a href="{{ url_for('photos.dropbox_photos') }}"> Dropbox</a>
+        <a href="{{ url_for('photos.photos_tree', parent_id=parent_id) }}">Tree</a><br>
+        {% for data in photos%}
+            {% for email, photo_data in data.items() %}
+                <h3>Photo upload by : {{ email }}</h3><br>
+                {% for id, urls in photo_data.items() %}
+                    {% if urls %}
+                        <a href="{{ url_for('photos.add_photo_description', photo_id=id) }}">
+                        <img src="{{ urls }}" alt="Photo from {{ email }}" width="100px" height="100px">
+                        </a>
+                    {% else %}
+                        <h3>No photos</h3>
+                        <hr>
+                    {% endif %}
                 {% endfor %}
-            {% else %}
-                <h3>No photos</h3>
-                <hr>
-            {% endif %}
+            {% endfor %}
+            <hr>
         {% endfor %}
     {% else %}
         <h2>Please select a photo from the offered services</h2><br>

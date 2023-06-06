@@ -63,19 +63,12 @@ def static_from_root():
     return send_from_directory(app.static_folder, 'robot.txt')
 
 
-@app.route('/revoke')
-def revoke():
-    if 'credentials' not in session:
-        return ('You need to <a href="/authorize">authorize</a> before ' +
-                'testing the code to revoke credentials')
-    credentials = google.oauth2.credentials.Credentials(
-        **session['credentials'])
+def revoke(token):
+    revoke_token = requests.post(REVOKE_TOKEN,
+                                 params={'token': token},
+                                 headers={'content-type': 'application/x-www-form-urlencoded'})
 
-    revoke = requests.post(REVOKE_TOKEN,
-                           params={'token': credentials.token},
-                           headers={'content-type': 'application/x-www-form-urlencoded'})
-
-    status_code = getattr(revoke, 'status_code')
+    status_code = getattr(revoke_token, 'status_code')
     if status_code == 200:
         return 'Credentials successfully revoked.'
     else:

@@ -22,7 +22,7 @@ def init_login_app(app):
 
 
 def send_email(email, message, body):
-    msg = Message(message, sender='danishevchuk@gmail.com', recipients=[email])
+    msg = Message(message, sender='phorever.cloud@gmail.com', recipients=[email])
     msg.body = body
     mail.send(msg)
 
@@ -125,6 +125,7 @@ def login():
 def logout():
     if current_user.is_authenticated:
         logout_user()
+
     return redirect(url_for('auth.login'))
 
 

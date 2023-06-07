@@ -1,0 +1,61 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for msg in messages %}
+                <p>{{ msg }}</p>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    <a href="{{ url_for('photos.user_photos') }}"><---back</a>
+    <h1>Phorever</h1><br>
+    {% if photo_data %}
+        {% for data in photo_data %}
+            {% for photo_id, photos_meta_data in data.items() %}
+                <label style="display: inline-block;" class="modal" data-target="modal-{{ photo_id }}">
+                    <img src="{{ photos_meta_data.baseUrl }}" alt="" width="100px" height="100px"><br>
+                    <label>{{ photos_meta_data.title }}</label><br>
+                    {% if photos_meta_data.description|length > 10 %}
+                        <label>{{ photos_meta_data.description[:10] }}...</label><br>
+                    {% else %}
+                        <label>{{ photos_meta_data.description }}</label><br>
+                    {% endif %}
+                </label>
+                <div class="modal-content" id="modal-{{ photo_id }}">
+                    <span class="close-button">&times;</span>
+                    <img src="{{ photos_meta_data.baseUrl }}" alt="" width="200px" height="200px"><br>
+                    <h2>{{ photos_meta_data.title }}</h2>
+                    <p>{{ photos_meta_data.description }}</p>
+                    <p>{{ photos_meta_data.location }}</p>
+                    <p>{{ photos_meta_data.creation_data }}</p>
+                    <button class="update-button">Update</button>
+                </div>
+
+               <form id="update-form-{{ photo_id }}" class="update-form" action="{{ url_for('photos.add_photo_description', photo_id=photo_id) }}" method="post" style="display: none;">
+                <span class="update-close-button">&times;</span>
+                <div class="form-content">
+                    <div class="form-image">
+                        <img src="{{ photos_meta_data.baseUrl }}" alt="" width="200px" height="200px">
+                    </div>
+                    <div class="form-inputs">
+                        <label for="update-title">Add title:</label>
+                        <input type="text" id="update-title" name="title" value="{{ photos_meta_data.title }}"><br>
+                        <label for="update-description">Add description:</label>
+                        <textarea id="update-description" name="description" cols="30" rows="10">{{ photos_meta_data.description }}</textarea><br>
+                        <label for="update-location">Add location:</label>
+                        <input type="text" id="update-location" name="location" value="{{ photos_meta_data.location  }}"><br>
+                        <label for="update-creation-date">Add date:</label>
+                        <input type="date" id="update-creation-date" name="creation_date" value="{{ photos_meta_data.creation_data }}"><br>
+                        <input type="submit" value="Update">
+                    </div>
+                </div>
+            </form>
+            {% endfor %}
+        {% endfor %}
+    {% else %}
+        <h3>Please add photos to Phorever</h3>
+    {% endif %}
+{% endblock %}
+
+

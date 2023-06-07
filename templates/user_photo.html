@@ -14,15 +14,42 @@
         <h2>Select more photos from services:</h2><br>
         <a href="{{ url_for('photos.google_photos') }}"> Google Photo</a>
         <a href="{{ url_for('photos.dropbox_photos') }}"> Dropbox</a>
-        <a href="{{ url_for('photos.photos_tree', parent_id=parent_id) }}">Tree</a><br>
-        {% for data in photos%}
+        <a href="{{ url_for('photos.photos_tree') }}">Tree</a><br>
+        {% for data in photos %}
             {% for email, photo_data in data.items() %}
                 <h3>Photo upload by : {{ email }}</h3><br>
                 {% for id, urls in photo_data.items() %}
                     {% if urls %}
-                        <a href="{{ url_for('photos.add_photo_description', photo_id=id) }}">
-                        <img src="{{ urls }}" alt="Photo from {{ email }}" width="100px" height="100px">
+                        <a href="#" class="modal" data-target="modal-{{ id }}">
+                            <img src="{{ urls }}" alt="Photo from {{ email }}" width="100px" height="100px">
                         </a>
+                        <div class="modal-content" id="modal-{{ id }}">
+                            <table>
+                                <tr>
+                                    <td>
+                                        <img src="{{ urls }}" alt="" width="300px" height="300px">
+                                    </td>
+                                    <td>
+                                        <form action="{{ url_for('photos.add_photo_description', photo_id=id) }}" method="post">
+                                        <div class="form-content">
+                                            <div class="form-inputs">
+                                                <label for="update-title">Add title:</label>
+                                                <input type="text" id="update-title" name="title"><br>
+                                                <label for="update-description">Add description:</label>
+                                                <textarea id="update-description" name="description" cols="30" rows="10"></textarea><br>
+                                                <label for="update-location">Add location:</label>
+                                                <input type="text" id="update-location" name="location"><br>
+                                                <label for="update-creation-date">Add date:</label>
+                                                <input type="date" id="update-creation-date" name="creation_date"><br>
+                                                <input type="submit" value="Update">
+                                            </div>
+                                        </div>
+                                        </form>
+                                        <span class="close-button" data-target="modal-{{ id }}">&times;</span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
                     {% else %}
                         <h3>No photos</h3>
                         <hr>

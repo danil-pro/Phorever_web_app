@@ -22,6 +22,8 @@
               {% endfor %}
             <input type="submit" width="100px" height="50px" class="btn btn-primary" style="position: fixed; bottom: 20px; right: 20px;" value="Add photos">
             </form>
+        {% else %}
+            <h3>No photos</h3>
         {% endif %}
     {% else %}
         <a href="{{ url_for('photos.dropbox_logout') }}"> logout From Dropbox</a><br>
@@ -36,6 +38,8 @@
               {% endfor %}
             <input type="submit" width="100px" height="50px" class="btn btn-primary" style="position: fixed; bottom: 20px; right: 20px;" value="Add photos">
             </form>
+        {% else %}
+            <h3>No photos</h3>
         {% endif %}
     {% endif %}
 {% endblock %}

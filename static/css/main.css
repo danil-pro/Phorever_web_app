@@ -1,0 +1,114 @@
+.modal-content {
+  display: none;
+  position: fixed;
+  z-index: 999;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 600px;
+  height: 400px;
+  background-color: #ffffff;
+  border: 1px solid #cccccc;
+  overflow-y: auto; /* Добавляем вертикальный скроллер при необходимости */
+  padding: 20px;
+}
+
+.modal-content table {
+  width: 100%;
+}
+
+.modal-content table td {
+  vertical-align: top;
+  padding: 10px;
+}
+
+.modal-content .close-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.modal-content .close-button:hover {
+  color: red;
+}
+
+.update-form {
+  display: none;
+  position: fixed;
+  z-index: 999;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 600px;
+  height: 400px;
+  background-color: #ffffff;
+  border: 1px solid #cccccc;
+  overflow-y: auto; /* Добавляем вертикальный скроллер при необходимости */
+  padding: 20px;
+}
+
+.update-form table {
+  width: 100%;
+}
+
+.update-form table td {
+  vertical-align: top;
+  padding: 10px;
+}
+
+.update-form .update-close-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.update-form .update-close-button:hover {
+  color: red;
+}
+
+.form-content {
+  display: flex;
+  align-items: center;
+}
+
+.form-image {
+  flex: 0 0 auto;
+  margin-right: 20px;
+}
+
+.form-image img {
+  width: 200px;
+  height: 200px;
+}
+
+.form-inputs {
+  flex: 1 1 auto;
+}
+
+.form-inputs label {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.form-inputs input,
+.form-inputs textarea {
+  width: 100%;
+  padding: 5px;
+  margin-bottom: 10px;
+}
+
+.form-inputs input[type="submit"] {
+  background-color: #4CAF50;
+  color: white;
+  padding: 10px 15px;
+  border: none;
+  cursor: pointer;
+}
+
+.form-inputs input[type="submit"]:hover {
+  background-color: #45a049;
+}

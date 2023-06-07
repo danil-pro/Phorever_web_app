@@ -40,22 +40,24 @@ class Worker:
                             media_item = items['mediaItem']
                             photo_id = Photos.query.filter_by(photos_data=media_item['id']).first()
                             photo_url[photo_id.id] = media_item['baseUrl']
-                    # Если дошли до этой точки без ошибок, выходим из цикла
+                    credentials['token'] = user_token
+                    credentials['refresh_token'] = user_refresh_token
                     break
 
-            except RefreshError:
+            except RefreshError as e:
+                credentials_dict = Credentials(
+                    **credentials)
+
                 revoke_token = requests.post(REVOKE_TOKEN,
-                                             params={'token': credentials.token},
+                                             params={'token': credentials_dict.token},
                                              headers={'content-type': 'application/x-www-form-urlencoded'})
 
                 status_code = getattr(revoke_token, 'status_code')
                 if status_code == 200:
                     print('ok')
                 else:
-                    return 'An error occurred.' + str(status_code)
-                # Возникла ошибка, продолжаем цикл заново
-            credentials['token'] = user_token
-            credentials['refresh_token'] = user_refresh_token
+                    print('An error occurred.' + str(status_code) + str(e))
+                    return 'An error occurred.' + str(status_code) + str(e)
         if dropbox_photos_urls:
             for url in dropbox_photos_urls:
                 photo_id = Photos.query.filter_by(photos_data=url).first()

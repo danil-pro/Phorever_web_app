@@ -204,22 +204,22 @@ def add_photo_description(photo_id):
     if current_user.is_authenticated:
         if 'credentials' not in session:
             return redirect(url_for('photos.google_authorize'))
-        photo = Photos.query.filter_by(id=photo_id).first()
-        photo_urls = worker.get_photo_data_from_db(photo, session['credentials'])
-        photo_meta_data = PhotosMetaData.query.filter_by(photo_id=photo_id).first()
+
         if request.method == "POST":
             title = request.form['title']
             description = request.form['description']
             location = request.form['location']
-            creation_data = request.form['creation_data']
+            creation_data = request.form['creation_date']
+
+            photo_meta_data = PhotosMetaData.query.filter_by(photo_id=photo_id).first()
+
             if not photo_meta_data:
-                new_photo_meta_data = PhotosMetaData(title=title,
-                                                     description=description,
-                                                     location=location,
-                                                     creation_data=creation_data, photo_id=photo_id)
+                new_photo_meta_data = PhotosMetaData(title=title, description=description,
+                                                     location=location, creation_data=creation_data,
+                                                     photo_id=photo_id)
                 db.session.add(new_photo_meta_data)
                 db.session.commit()
-                return redirect(url_for('photos.user_photos'))
+                flash('Photo add to tree successful')
             else:
                 if title:
                     photo_meta_data.title = title
@@ -231,21 +231,31 @@ def add_photo_description(photo_id):
                     photo_meta_data.creation_data = creation_data
 
                 db.session.commit()
-                return redirect(url_for('photos.user_photos'))
+                flash('Update successful')
+            return redirect(url_for('photos.photos_tree'))
 
-        return render_template('add_photo_description.html', photo_urls=photo_urls, photo_id=photo_id)
     else:
         return redirect(url_for('auth.login'))
 
 
-@photos.route('/photos_tree/<parent_id>', methods=['GET', 'POST'])
-def photos_tree(parent_id):
+@photos.route('/photos_tree', methods=['GET', 'POST'])
+def photos_tree():
     if current_user.is_authenticated:
         if 'credentials' not in session:
             return redirect(url_for('photos.google_authorize'))
-
-
+        current_user_family = Users.query.filter_by(parent_id=current_user.parent_id).all()
+        photo_data = []
+        for family_user in current_user_family:
+            family_user_photos = Photos.query.filter_by(user_id=family_user.id).all()
+            photo_urls = worker.get_photos_from_db(family_user_photos, session['credentials'])
+            for photo_id, url in photo_urls.items():
+                photos_meta_data = PhotosMetaData.query.filter_by(photo_id=photo_id).first()
+                if photos_meta_data:
+                    photo_data.append({photo_id: {'baseUrl': url,
+                                                  'title': photos_meta_data.title,
+                                                  'description': photos_meta_data.description,
+                                                  'location': photos_meta_data.location,
+                                                  'creation_data': photos_meta_data.creation_data}})
+            return render_template('photos_tree.html', photo_data=photo_data)
     else:
         return redirect(url_for('auth.login'))
-
-

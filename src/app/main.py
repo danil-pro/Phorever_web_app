@@ -1,19 +1,23 @@
-from auth import auth, init_login_app
-from url_photos_getters import photos
-from config import *
+from src.auth.auth import auth, init_login_app
+from src.oauth2.oauth2 import oauth2
+from src.photos.photo_handler import photos
+from src.app.config import *
 from flask import *
-from model import db
 from google.oauth2.credentials import Credentials
 import requests
 import google.oauth2.credentials
+from src.app.model import db
 
 
 def create_app():
-    app = Flask(__name__, template_folder='../templates', static_folder='../static')
+    app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), '..', '..', 'templates'),
+                static_folder=os.path.join(os.path.dirname(__file__), '..', '..', 'static'))
 
     app.register_blueprint(photos, url_prefix='/photos')
 
     app.register_blueprint(auth, url_prefix='/auth')
+
+    app.register_blueprint(oauth2, url_prefix='/oauth2')
 
     app.secret_key = SECRET_KEY
 

@@ -12,8 +12,6 @@ class Users(db.Model, UserMixin):
     verification_token = db.Column(db.String(10), unique=True, nullable=True)
     parent_token = db.Column(db.String(10), nullable=True)
     parent_id = db.Column(db.Integer, nullable=True)
-    # token = db.Column(db.String(300), nullable=True)
-    # refresh_token = db.Column(db.String(300), nullable=True)
 
     def __init__(self, email, password):
         self.email = email
@@ -30,6 +28,7 @@ class PhotosMetaData(db.Model):
     location = db.Column(db.String(1000), nullable=True)
     creation_data = db.Column(db.String(10), nullable=True)
     photo_id = db.Column(db.Integer, db.ForeignKey('photos.id'), nullable=False)
+    photo = db.relationship('Photos', backref='metadata')
 
 
 class Photos(db.Model):
@@ -39,6 +38,15 @@ class Photos(db.Model):
     token = db.Column(db.String(300), nullable=True)
     refresh_token = db.Column(db.String(300), nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    users = db.relationship('Users', secondary='editing_permission', backref='photos')
 
     def __repr__(self):
         return f'<Photo {self.id}>'
+
+
+class EditingPermission(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    photo_id = db.Column(db.Integer, db.ForeignKey('photos.id'), nullable=False)
+    email = db.Column(db.String(225), db.ForeignKey('users.email'), nullable=False)
+    editable = db.Column(db.Boolean, default=False)
+

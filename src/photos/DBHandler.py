@@ -4,12 +4,12 @@ from google.auth.exceptions import RefreshError
 
 import requests
 
-from config import *
+from src.app.config import *
 
-from model import Photos
+from src.app.model import Photos
 
 
-class Worker:
+class DBHandler:
     def __init__(self):
         pass
 
@@ -75,10 +75,9 @@ class Worker:
                           credentials=Credentials.from_authorized_user_info(credentials),
                           static_discovery=False)
             response = drive.mediaItems().get(mediaItemId=user_photo.photos_data).execute()
+            print(response)
             credentials['token'] = user_token
             credentials['refresh_token'] = user_refresh_token
             return response['baseUrl']
         else:
             return user_photo.photos_data
-
-

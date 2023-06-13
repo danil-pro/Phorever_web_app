@@ -1,0 +1,63 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for msg in messages %}
+                <p>{{ msg }}</p>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    <a href="{{ url_for('photos.user_photos') }}"><---Back</a><br>
+    {% if source_function == '/photos/google_photos' %}
+        <a href="{{ url_for('oauth2.google_logout') }}">Logout From Google</a><br>
+        <h1 class="google">Photos from Google Photos</h1>
+        <div id="photos-container">
+            {% if base_url %}
+                <form action="{{ url_for('photos.add_photo') }}" method="post">
+                    <input type="hidden" name="source_function" value="{{ source_function }}">
+                    {% for photo in base_url %}
+                        <label style="display: inline-block;">
+                            <img src="{{ photo['baseUrl'] }}" alt="" width="100px" height="100px"><br>
+                            <input type="checkbox" name="selected_photos" value="{{ photo['photoId'] }}"> Add photo
+                        </label>
+                    {% endfor %}
+                    <input type="submit" width="100px" height="50px" class="btn btn-primary" style="position: fixed; bottom: 20px; right: 20px;" value="Add photos">
+                </form>
+                {% if next_page_token %}
+                    <div class="pagination-buttons">
+                        <form action="{{ url_for('photos.google_photos') }}" method="post">
+
+                            <input type="hidden" name="next_page_token" value="{{ next_page_token }}">
+                            <button type="submit" name="next_page" class="btn btn-primary" style="position: fixed; bottom: 20px; left: 20px;">Next Page</button>
+                        </form>
+                    </div>
+                {% endif %}
+            {% else %}
+                <h3>No photos</h3>
+            {% endif %}
+        </div>
+    {% else %}
+        <a href="{{ url_for('oauth2.dropbox_logout') }}">Logout From Dropbox</a><br>
+        {% if base_url %}
+            <form action="{{ url_for('photos.add_photo') }}" method="post">
+                <input type="hidden" name="source_function" value="{{ source_function }}">
+                {% for photo in base_url %}
+                    <label style="display: inline-block;">
+                        <img src="{{ photo }}" alt="" width="100px" height="100px"><br>
+                        <input type="checkbox" name="selected_photos" value="{{ photo }}"> Add photo
+                    </label>
+                {% endfor %}
+                <input type="submit" width="100px" height="50px" class="btn btn-primary" style="position: fixed; bottom: 20px; right: 20px;" value="Add photos">
+            </form>
+            <div class="pagination-buttons">
+                <form action="{{ url_for('photos.dropbox_photos') }}" method="post">
+{#                    <input type="hidden" name="next_page_token" va }}">#}
+                    <button type="submit" name="next_page" class="btn btn-primary" style="position: fixed; bottom: 20px; left: 20px;">Next Page</button>
+                </form>
+            </div>
+        {% else %}
+            <h3>No photos</h3>
+        {% endif %}
+    {% endif %}
+{% endblock %}

@@ -1,39 +1,4 @@
-.modal-content {
-  display: none;
-  position: fixed;
-  z-index: 999;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 600px;
-  height: 400px;
-  background-color: #ffffff;
-  border: 1px solid #cccccc;
-  overflow-y: auto; /* Добавляем вертикальный скроллер при необходимости */
-  padding: 20px;
-}
-
-.modal-content table {
-  width: 100%;
-}
-
-.modal-content table td {
-  vertical-align: top;
-  padding: 10px;
-}
-
-.modal-content .close-button {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  font-size: 24px;
-  cursor: pointer;
-}
-
-.modal-content .close-button:hover {
-  color: red;
-}
-
+.modal-content,
 .update-form {
   display: none;
   position: fixed;
@@ -42,23 +7,29 @@
   top: 50%;
   transform: translate(-50%, -50%);
   width: 600px;
+  max-width: 100%;
   height: 400px;
+  max-height: 100%;
   background-color: #ffffff;
   border: 1px solid #cccccc;
   overflow-y: auto; /* Добавляем вертикальный скроллер при необходимости */
   padding: 20px;
+  box-sizing: border-box;
 }
 
+.modal-content table,
 .update-form table {
   width: 100%;
 }
 
+.modal-content table td,
 .update-form table td {
   vertical-align: top;
   padding: 10px;
 }
 
-.update-form .update-close-button {
+.close-button,
+.update-close-button {
   position: absolute;
   top: 10px;
   right: 10px;
@@ -66,7 +37,8 @@
   cursor: pointer;
 }
 
-.update-form .update-close-button:hover {
+.close-button:hover,
+.update-close-button:hover {
   color: red;
 }
 
@@ -83,6 +55,8 @@
 .form-image img {
   width: 200px;
   height: 200px;
+  max-width: 100%;
+  max-height: 100%;
 }
 
 .form-inputs {
@@ -99,6 +73,7 @@
   width: 100%;
   padding: 5px;
   margin-bottom: 10px;
+  box-sizing: border-box;
 }
 
 .form-inputs input[type="submit"] {
@@ -109,6 +84,53 @@
   cursor: pointer;
 }
 
+.update-button {
+  background-color: #4CAF50;
+  color: white;
+  padding: 10px 15px;
+  border: none;
+  cursor: pointer;
+}
+
 .form-inputs input[type="submit"]:hover {
   background-color: #45a049;
 }
+
+/* Дополнительные стили при уменьшении экрана */
+@media screen and (max-width: 768px) {
+  .modal-content,
+  .update-form {
+    width: 90%;
+    height: auto;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .modal-content,
+  .update-form {
+    width: 100%;
+    height: auto;
+  }
+}
+
+.allow-editing-label {
+    display: flex;
+    align-items: center;
+    margin-right: 10px;
+}
+
+.user-checkbox {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.user-email {
+  margin-right: 2px;
+}
+
+.allow-button {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+

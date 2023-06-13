@@ -1,23 +1,25 @@
 from flask_user import UserManager
-from Forms import RegisterForm, LoginForm
-from flask_login import LoginManager, login_user, current_user, logout_user, login_required
+from src.app.Forms import RegisterForm, LoginForm
+from flask_login import LoginManager, login_user, current_user, logout_user
+from flask_bootstrap import Bootstrap
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask import *
-from model import db, Users
+from src.app.model import db, Users
 from flask_mail import Mail, Message
 import random
 import string
-import requests
 
-auth = Blueprint('auth', __name__, template_folder='../templates', static_folder='../static')
+auth = Blueprint('auth', __name__, template_folder='../templates/auth_templates', static_folder='../static')
 
 login_manager = LoginManager()
 mail = Mail()
+bootstrap = Bootstrap()
 
 
 def init_login_app(app):
     login_manager.init_app(app)
     mail.init_app(app)
+    bootstrap.init_app(app)
     UserManager(app, db, Users)
 
 
@@ -68,8 +70,8 @@ def register(parent_token=None):
     {url_for('auth.verify_email', email=form.email.data, token=new_user.verification_token, _external=True)}
     Если вы не запрашивали подтверждение своей электронной почты, то просто проигнорируйте это сообщение.
     ''')
-        return render_template('verification.html')
-    return render_template('register.html', form=form, parent_token=parent_token)
+        return render_template('auth_templates/verification.html')
+    return render_template('auth_templates/register.html', form=form, parent_token=parent_token)
 
 
 @auth.route('/verify-email/<email>/<token>', methods=['GET', 'POST'])
@@ -107,7 +109,7 @@ def login():
         user = load_user(email)
         if not user:
             flash('no user', 'info')
-            return render_template('login.html', form=form)
+            return render_template('auth_templates/login.html', form=form)
         elif user.password and check_password_hash(user.password, password):
             login_user(user)
             current_user.is_authenticated = True
@@ -118,7 +120,7 @@ def login():
             return redirect(url_for('auth.login'))
         else:
             flash('Invalid username or password')
-    return render_template('login.html', form=form)
+    return render_template('auth_templates/login.html', form=form)
 
 
 @auth.route('/logout')
@@ -137,7 +139,7 @@ def profile():
             send_email(invite, f'Invite to Phorever from {current_user.email}',
                        f"{url_for('auth.register', parent_token=current_user.parent_token,  _external=True)}")
             flash('The invitation has been sent')
-        return render_template('profile.html')
+        return render_template('auth_templates/profile.html')
     else:
         return redirect(url_for('auth.login'))
 

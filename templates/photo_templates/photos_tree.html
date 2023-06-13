@@ -1,0 +1,88 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for msg in messages %}
+                <p>{{ msg }}</p>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    <a href="{{ url_for('photos.user_photos') }}"><---back</a>
+    <h1>Phorever</h1><br>
+    {% if photo_data %}
+        {% for data in photo_data %}
+            {% for email, photos in data.items() %}
+                {% for photo_id, photos_meta_data in photos.items() %}
+                    <label style="display: inline-block;" data-toggle="modal" data-target="#modal-{{ photo_id }}">
+                        <img src="{{ photos_meta_data.baseUrl }}" alt="" width="100px" height="100px"><br>
+                        <label>{{ photos_meta_data.title }}</label><br>
+                        {% if photos_meta_data.description|length > 10 %}
+                            <label>{{ photos_meta_data.description[:10] }}...</label><br>
+                        {% else %}
+                            <label>{{ photos_meta_data.description }}</label><br>
+                        {% endif %}
+                    </label>
+                    <div class="modal fade" id="modal-{{ photo_id }}" tabindex="-1" role="dialog" aria-labelledby="modalLabel-{{ photo_id }}" aria-hidden="true">
+                        <div class="modal-dialog" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="modalLabel-{{ photo_id }}">Photo from {{ email }}</h5>
+                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                        <span aria-hidden="true">&times;</span>
+                                    </button>
+                                </div>
+                                <div class="modal-body overflow-auto">
+                                    <img src="{{ photos_meta_data.baseUrl }}" alt="" width="200px" height="200px"><br>
+                                    <h2>{{ photos_meta_data.title }}</h2>
+                                    <p>{{ photos_meta_data.description }}</p>
+                                    <p>{{ photos_meta_data.location }}</p>
+                                    <p>{{ photos_meta_data.creation_data }}</p>
+                                    <button class="update-button btn btn-primary" data-toggle="modal" data-dismiss="modal" data-target="#update-form-{{ photo_id }}">Update</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal fade" id="update-form-{{ photo_id }}" tabindex="-1" role="dialog" aria-labelledby="update-form-modalLabel-{{ photo_id }}" aria-hidden="true">
+                        <div class="modal-dialog" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="update-form-modalLabel-{{ photo_id }}">Update Photo</h5>
+                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                        <span aria-hidden="true">&times;</span>
+                                    </button>
+                                </div>
+                                <div class="modal-body" style="max-height: 400px; overflow-y: auto;">
+                                    {% if current_user.email == email or permissions.query.filter_by(photo_id=photo_id).first() %}
+                                        <div class="form-group">
+                                            <div class="form-image">
+                                                <img src="{{ photos_meta_data.baseUrl }}" alt="" width="200px" height="200px">
+                                            </div>
+                                            <label for="update-title">Add title:</label>
+                                            <input type="text" class="form-control" id="update-title" name="title" value="{{ photos_meta_data.title }}">
+                                            <label for="update-description">Add description:</label>
+                                            <textarea class="form-control" id="update-description" name="description" cols="30" rows="10">{{ photos_meta_data.description }}</textarea>
+                                            <label for="update-location">Add location:</label>
+                                            <input type="text" class="form-control" id="update-location" name="location" value="{{ photos_meta_data.location }}">
+                                            <label for="update-creation-date">Add date:</label>
+                                            <input type="date" class="form-control" id="update-creation-date" name="creation_date" value="{{ photos_meta_data.creation_data }}">
+                                        </div>
+                                        <button type="submit" class="btn btn-primary">Update</button>
+                                    {% else %}
+                                        <img src="{{ photos_meta_data.baseUrl }}" alt="Photo" width="200px" height="200px">
+                                        <h3>You don`t have a permission</h3>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endfor %}
+        {% endfor %}
+    {% else %}
+        <h3>Please add photos to Phorever</h3>
+    {% endif %}
+{% endblock %}
+
+

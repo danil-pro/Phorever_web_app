@@ -1,4 +1,4 @@
-from src.auth.auth import auth, init_login_app
+from src.auth.auth import auth, init_login_app, current_user
 from src.oauth2.oauth2 import oauth2
 from src.photos.photo_handler import photos
 from src.app.config import *
@@ -6,8 +6,10 @@ from flask import *
 from google.oauth2.credentials import Credentials
 import requests
 import google.oauth2.credentials
-from src.app.model import db
+from src.photos.DBHandler import DBHandler
+from src.app.model import db, Photos, PhotosMetaData, EditingPermission, Users
 
+db_handler = DBHandler()
 
 def create_app():
     app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), '..', '..', 'templates'),
@@ -47,8 +49,29 @@ app = create_app()
 
 
 @app.route('/')
-def index():
-    return render_template('index.html')
+def user_photos():
+    if current_user.is_authenticated:
+        if 'credentials' not in session:
+            return redirect(url_for('oauth2.google_authorize'))
+        current_user_family = Users.query.filter_by(parent_id=current_user.parent_id).all()
+        photo_url = []
+        family_users = []
+        for family_user in current_user_family:
+            family_user_photos = Photos.query.filter_by(user_id=family_user.id).all()
+            correct_family_user_photos = []
+            for photo in family_user_photos:
+                photos_meta_data = PhotosMetaData.query.filter_by(photo_id=photo.id).first()
+                if not photos_meta_data:
+                    correct_family_user_photos.append(photo)
+            photo_urls = db_handler.get_photos_from_db(correct_family_user_photos, session['credentials'])
+            dict_photo_data = {family_user.email: photo_urls}
+            family_users.append(family_user.email)
+            photo_url.append(dict_photo_data)
+        return render_template('photo_templates/user_photo.html', photos=photo_url,
+                               parent_id=current_user.parent_id, family_users=family_users,
+                               permissions=EditingPermission)
+    else:
+        return redirect(url_for('auth.login'))
 
 
 @app.route('/session_clear')
@@ -60,6 +83,16 @@ def session_clear():
 @app.route('/googleb3f997e5d55f0443.html')
 def google_verif():
     return render_template('googleb3f997e5d55f0443.html')
+
+
+@app.route('/privacy')
+def privacy():
+    return '''<iframe src="https://phorever.cloud/privacy" width="100%" height="100%"></iframe>'''
+
+
+@app.route('/elua')
+def elua():
+    return '''<iframe src="https://phorever.cloud/elua" width="100%" height="100%"></iframe>'''
 
 
 @app.route('/robot.txt')

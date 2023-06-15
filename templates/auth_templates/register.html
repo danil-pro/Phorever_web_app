@@ -8,24 +8,26 @@
             {% endfor %}
         {% endif %}
     {% endwith %}
-    <form method="POST" action="{{ url_for('auth.register') }}">
-      <p>
-        <label>Email:</label>
-        {{ form.email() }}
-      </p>
-      <p>
-        <label>Password:</label>
-        {{ form.password() }}
-      </p>
-      <p>
-        <label>Confirm Password:</label>
-        {{ form.confirm_password() }}
-      </p>
-        {{ form.hidden_tag() }}
-            <input type="hidden" name="parent_token" value="{{ parent_token }}">
-      <p>
-        {{ form.submit() }}
-      </p>
-    </form>
+    <div class="d-flex justify-content-center">
+        <form method="POST" action="{{ url_for('auth.register') }}">
+          <p>
+            <label>Email:</label>
+            {{ form.email() }}
+          </p>
+          <p>
+            <label>Password:</label>
+            {{ form.password() }}
+          </p>
+          <p>
+            <label>Confirm Password:</label>
+            {{ form.confirm_password() }}
+          </p>
+            {{ form.hidden_tag() }}
+                <input type="hidden" name="parent_token" value="{{ parent_token }}">
+          <p>
+            {{ form.submit() }}
+          </p>
+        </form>
+    </div>
 
 {% endblock %}

@@ -113,7 +113,7 @@ def login():
         elif user.password and check_password_hash(user.password, password):
             login_user(user)
             current_user.is_authenticated = True
-            return redirect(request.args.get('next') or url_for('index'))
+            return redirect(request.args.get('next') or url_for('photos.user_photos'))
         elif user and not user.is_verified:
             flash('Ваша электронная почта не была подтверждена. Проверьте свою почту и следуйте ин'
                   'струкциям, чтобы завершить регистрацию.')

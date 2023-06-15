@@ -8,123 +8,135 @@
             {% endfor %}
         {% endif %}
     {% endwith %}
-    <a href="{{ url_for('index') }}"><---back</a>
-    <h1>Your Photo</h1><br>
+    <h1 class="text-center">Your Photo</h1><br>
     {% if photos %}
-        <h2>Select more photos from services:</h2><br>
-        <a href="{{ url_for('photos.google_photos') }}"> Google Photo</a>
-        <a href="{{ url_for('photos.dropbox_photos') }}"> Dropbox</a>
-        <a href="{{ url_for('photos.photos_tree') }}">Family tree</a><br>
-        {% for data in photos %}
-            {% for email, photo_data in data.items() %}
-                <h3>Photo upload by : {{ email }}</h3><br>
-                {% for id, urls in photo_data.items() %}
-                    {% if urls %}
-                        <a href="#" data-toggle="modal" data-target="#modal-{{ id }}">
-                            <img src="{{ urls }}" alt="Photo from {{ email }}" width="100px" height="100px">
-                        </a>
-                        {% if current_user.email == email or permissions.query.filter_by(photo_id=id).first()%}
-                            <div class="modal fade" id="modal-{{ id }}" tabindex="-1" role="dialog" aria-labelledby="modalLabel-{{ id }}" aria-hidden="true">
-                                <div class="modal-dialog" role="document">
-                                    <div class="modal-content">
-                                        <div class="modal-header">
-                                            <h5 class="modal-title" id="modalLabel-{{ id }}">Photo Details</h5>
-                                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                                <span aria-hidden="true">&times;</span>
-                                            </button>
-                                        </div>
-                                        <div class="modal-body">
-                                            <img src="{{ urls }}" alt="Photo" width="200px" height="200px">
-                                            <form action="{{ url_for('photos.add_photo_description', photo_id=id) }}" method="post">
-                                                <div class="form-group">
-                                                    <label for="update-title">Add title:</label>
-                                                    <input type="text" class="form-control" id="update-title" name="title" value="">
-                                                </div>
-                                                <div class="form-group">
-                                                    <label for="update-description">Add description:</label>
-                                                    <textarea class="form-control" id="update-description" name="description" cols="30" rows="10"></textarea>
-                                                </div>
-                                                <div class="form-group">
-                                                    <label for="update-location">Add location:</label>
-                                                    <input type="text" class="form-control" id="update-location" name="location" value="">
-                                                </div>
-                                                <div class="form-group">
-                                                    <label for="update-creation-date">Add date:</label>
-                                                    <input type="date" class="form-control" id="update-creation-date" name="creation_date" value="">
-                                                </div>
-                                                <input type="submit" class="btn btn-primary" value="Phorever">
-                                            </form>
-                                            <button class="update-button btn btn-primary" data-toggle="modal" data-dismiss="modal" data-target="#update-form-{{ id }}">allow editing</button>
+        <h3 class="text-center">Select more photos from services:</h3><br>
+        <div class="d-flex justify-content-center">
+            <a class="ml-3" href="{{ url_for('photos.google_photos') }}"> <h5>Google Photo </h5></a>
+            <a class="ml-3" href="{{ url_for('photos.dropbox_photos') }}"> <h5>Dropbox </h5></a>
+{#            <a href="{{ url_for('photos.photos_tree') }}"><h5>Family tree</h5></a><br>#}
+        </div>
+        <hr>
+            {% for data in photos %}
+                {% for email, photo_data in data.items() %}
+                    <h5 class="text-center">Photo upload by : {{ email }}</h5><br>
+                    <div class="d-flex justify-content-center flex-wrap">
+                    {% for id, urls in photo_data.items() %}
+                        {% if urls %}
+
+                            <div class="photo-container mx-1 my-2 text-center" style="display: inline-block;">
+                                <a href="#" data-toggle="modal" data-target="#modal-{{ id }}">
+                                    <img src="{{ urls }}" alt="Photo from {{ email }}" width="100px" height="100px">
+                                </a><br>
+{#                                <label>#}
+{#                                    <input type="checkbox" class="photo-checkbox" value="{{ id }}">Select Photo#}
+{#                                </label>#}
+                            </div>
+    {#                        остальной код #}
+                            {% if current_user.email == email or permissions.query.filter_by(photo_id=id).first()%}
+                                <div class="modal fade" id="modal-{{ id }}" tabindex="-1" role="dialog" aria-labelledby="modalLabel-{{ id }}" aria-hidden="true">
+                                    <div class="modal-dialog" role="document">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title" id="modalLabel-{{ id }}">Photo Details</h5>
+                                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                    <span aria-hidden="true">&times;</span>
+                                                </button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <img src="{{ urls }}" alt="Photo" width="200px" height="200px">
+                                                <form action="{{ url_for('photos.add_photo_description') }}" method="post">
+                                                    <input type="hidden" name="photo_id" value="{{ id }}">
+                                                    <div class="form-group">
+                                                        <label for="update-title">Add title:</label>
+                                                        <input type="text" class="form-control" id="update-title" name="title" value="">
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label for="update-description">Add description:</label>
+                                                        <textarea class="form-control" id="update-description" name="description" cols="30" rows="10"></textarea>
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label for="update-location">Add location:</label>
+                                                        <input type="text" class="form-control" id="update-location" name="location" value="">
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label for="update-creation-date">Add date:</label>
+                                                        <input type="date" class="form-control" id="update-creation-date" name="creation_date" value="">
+                                                    </div>
+                                                    <input type="submit" class="btn" value="Phorever">
+                                                </form>
+                                                <button class="update-button btn" data-toggle="modal" data-dismiss="modal" data-target="#update-form-{{ id }}">allow editing</button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            <div class="modal fade" id="update-form-{{ id }}" tabindex="-1" role="dialog" aria-labelledby="updateFormLabel-{{ id }}" aria-hidden="true">
-                                <div class="modal-dialog" role="document">
-                                    <div class="modal-content">
-                                        <div class="modal-header">
-                                            <h5 class="modal-title" id="updateFormLabel-{{ id }}">Allow Editing</h5>
-                                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                                <span aria-hidden="true">&times;</span>
-                                            </button>
-                                        </div>
-                                        <form action="{{ url_for('photos.add_editing_permission', photo_id=id) }}" method="post">
-                                            <div class="modal-body">
-                                                <div class="form-content">
-                                                    <div class="form-inputs">
-                                                        <div class="form-row">
-                                                            <h3 class="allow-editing-label">Allow editing for:</h3>
-                                                            <hr>
-                                                            {% for email in family_users %}
-                                                                {% if email %}
-                                                                    {% if current_user.email != email%}
-                                                                        {% if not permissions.query.filter_by(email=email).first() %}
-                                                                            <label class="user-checkbox" style="display: flex; align-items: center;">
-                                                                                <span class="user-email" style="vertical-align: middle;">{{ email }}</span>
-                                                                                <input type="checkbox" name="selected_users" value="{{ email }}" style="margin-left: 2px;"><br>
-                                                                            </label>
+                                <div class="modal fade" id="update-form-{{ id }}" tabindex="-1" role="dialog" aria-labelledby="updateFormLabel-{{ id }}" aria-hidden="true">
+                                    <div class="modal-dialog" role="document">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title" id="updateFormLabel-{{ id }}">Allow Editing</h5>
+                                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                    <span aria-hidden="true">&times;</span>
+                                                </button>
+                                            </div>
+                                            <form action="{{ url_for('photos.add_editing_permission', photo_id=id) }}" method="post">
+                                                <div class="modal-body">
+                                                    <div class="form-content">
+                                                        <div class="form-inputs">
+                                                            <div class="form-row">
+                                                                <h3 class="allow-editing-label">Allow editing for:</h3>
+                                                                <hr>
+                                                                {% for email in family_users %}
+                                                                    {% if email %}
+                                                                        {% if current_user.email != email%}
+                                                                            {% if not permissions.query.filter_by(email=email).first() %}
+                                                                                <label class="user-checkbox" style="display: flex; align-items: center;">
+                                                                                    <span class="user-email" style="vertical-align: middle;">{{ email }}</span>
+                                                                                    <input type="checkbox" name="selected_users" value="{{ email }}" style="margin-left: 2px;"><br>
+                                                                                </label>
+                                                                            {% endif %}
                                                                         {% endif %}
                                                                     {% endif %}
-                                                                {% endif %}
-                                                            {% endfor %}
-                                                        </div>
-                                                        <div class="form-row">
-                                                            <input type="submit" value="Allow" class="allow-button">
+                                                                {% endfor %}
+                                                            </div>
+                                                            <div class="form-row">
+                                                                <input type="submit" value="Allow" class="allow-button">
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% else %}
+                                <div class="modal fade" id="modal-{{ id }}" tabindex="-1" role="dialog" aria-labelledby="modalLabel-{{ id }}" aria-hidden="true">
+                                    <div class="modal-dialog" role="document">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title" id="modalLabel-{{ id }}">Photo Details</h5>
+                                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                    <span aria-hidden="true">&times;</span>
+                                                </button>
                                             </div>
-                                        </form>
+                                            <div class="modal-body">
+                                                <img src="{{ urls }}" alt="Photo" width="200px" height="200px">
+                                                <h3>You don`t have a permission</h3>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            {% endif %}
                         {% else %}
-                            <div class="modal fade" id="modal-{{ id }}" tabindex="-1" role="dialog" aria-labelledby="modalLabel-{{ id }}" aria-hidden="true">
-                                <div class="modal-dialog" role="document">
-                                    <div class="modal-content">
-                                        <div class="modal-header">
-                                            <h5 class="modal-title" id="modalLabel-{{ id }}">Photo Details</h5>
-                                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                                <span aria-hidden="true">&times;</span>
-                                            </button>
-                                        </div>
-                                        <div class="modal-body">
-                                            <img src="{{ urls }}" alt="Photo" width="200px" height="200px">
-                                            <h3>You don`t have a permission</h3>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            <h3>No photos</h3>
+                            <hr>
                         {% endif %}
-                    {% else %}
-                        <h3>No photos</h3>
-                        <hr>
-                    {% endif %}
+                    {% endfor %}
                 {% endfor %}
+                </div>
+{#                <hr>#}
             {% endfor %}
-            <hr>
-        {% endfor %}
     {% else %}
         <h2>Please select a photo from the offered services</h2><br>
         <a href="{{ url_for('photos.google_photos') }}"> Google Photo</a>

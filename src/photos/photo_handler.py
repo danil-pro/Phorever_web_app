@@ -127,32 +127,6 @@ async def dropbox_photos():
     return redirect(url_for('auth.login'))
 
 
-# @photos.route('/user_photos', methods=['GET', 'POST'])
-# def user_photos():
-#     if current_user.is_authenticated:
-#         if 'credentials' not in session:
-#             return redirect(url_for('oauth2.google_authorize'))
-#         current_user_family = Users.query.filter_by(parent_id=current_user.parent_id).all()
-#         photo_url = []
-#         family_users = []
-#         for family_user in current_user_family:
-#             family_user_photos = Photos.query.filter_by(user_id=family_user.id).all()
-#             correct_family_user_photos = []
-#             for photo in family_user_photos:
-#                 photos_meta_data = PhotosMetaData.query.filter_by(photo_id=photo.id).first()
-#                 if not photos_meta_data:
-#                     correct_family_user_photos.append(photo)
-#             photo_urls = db_handler.get_photos_from_db(correct_family_user_photos, session['credentials'])
-#             dict_photo_data = {family_user.email: photo_urls}
-#             family_users.append(family_user.email)
-#             photo_url.append(dict_photo_data)
-#         return render_template('photo_templates/user_photo.html', photos=photo_url,
-#                                parent_id=current_user.parent_id, family_users=family_users,
-#                                permissions=EditingPermission)
-#     else:
-#         return redirect(url_for('auth.login'))
-
-
 @photos.route('/add_photo_description', methods=['GET', 'POST'])
 def add_photo_description():
     if current_user.is_authenticated:
@@ -195,13 +169,14 @@ def add_photo_description():
         return redirect(url_for('auth.login'))
 
 
-@photos.route('/add_editing_permission/<photo_id>', methods=['GET', 'POST'])
-def add_editing_permission(photo_id):
+@photos.route('/add_editing_permission', methods=['GET', 'POST'])
+def add_editing_permission():
     if current_user.is_authenticated:
         if 'credentials' not in session:
             return redirect(url_for('oauth2.google_authorize'))
         if request.method == "POST":
             photos_data = request.form.getlist('selected_users')
+            photo_id = request.form['photo_id']
             for email in photos_data:
                 user = Users.query.filter_by(email=email).first()
                 permissions = EditingPermission(photo_id=photo_id, email=user.email, editable=True)
@@ -219,7 +194,9 @@ def photos_tree():
             return redirect(url_for('oauth2.google_authorize'))
         current_user_family = Users.query.filter_by(parent_id=current_user.parent_id).all()
         photo_data = []
+        family_users = []
         for family_user in current_user_family:
+            family_users.append(family_user.email)
             family_user_photos = Photos.query.filter_by(user_id=family_user.id).all()
             photo_urls = db_handler.get_photos_from_db(family_user_photos, session['credentials'])
             for photo_id, url in photo_urls.items():
@@ -231,6 +208,7 @@ def photos_tree():
                                                                       'location': photos_meta_data.location,
                                                                       'creation_data': photos_meta_data.creation_data}}})
         print(photo_data)
-        return render_template('photo_templates/photos_tree.html', photo_data=photo_data, permissions=EditingPermission)
+        return render_template('photo_templates/photos_tree.html',
+                               photo_data=photo_data, permissions=EditingPermission, family_users=family_users)
     else:
         return redirect(url_for('auth.login'))

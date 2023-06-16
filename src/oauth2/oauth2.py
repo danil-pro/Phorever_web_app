@@ -53,7 +53,7 @@ def google_oauth2callback():
         credentials = google_auth.build_credentials(request.url)
         session['credentials'] = google_auth.credentials_to_dict(credentials)
 
-        return redirect(url_for('photos.user_photos'))
+        return redirect(url_for('user_photos'))
     except Exception as e:
         print(e)
         return redirect(url_for('index'))

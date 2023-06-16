@@ -11,10 +11,11 @@
 {#    <a href="{{ url_for('photos.user_photos') }}"><---back</a>#}
     <h1>Phorever</h1><br>
     {% if photo_data %}
+        <div class="d-flex justify-content-center flex-wrap">
         {% for data in photo_data %}
             {% for email, photos in data.items() %}
                 {% for photo_id, photos_meta_data in photos.items() %}
-                    <div class="photo-container mx-1 my-2 text-center" style="display: inline-block;" data-toggle="modal" data-target="#modal-{{ photo_id }}">
+                    <div class="photo-content text-center" data-toggle="modal" data-target="#modal-{{ photo_id }}">
                         <img src="{{ photos_meta_data.baseUrl }}" alt="" width="100px" height="100px"><br>
                         {% if photos_meta_data.title|length > 10 %}
                             <label>{{ photos_meta_data.title[:10] }}...</label><br>
@@ -42,7 +43,9 @@
                                     <p>{{ photos_meta_data.description }}</p>
                                     <p>{{ photos_meta_data.location }}</p>
                                     <p>{{ photos_meta_data.creation_data }}</p>
-                                    <button class="update-button btn btn-primary" data-toggle="modal" data-dismiss="modal" data-target="#update-form-{{ photo_id }}">Update</button>
+                                    {% if current_user.email == email or permissions.query.filter_by(photo_id=photo_id).first()  %}
+                                        <button class="update-button btn btn-primary" data-toggle="modal" data-dismiss="modal" data-target="#update-form-{{ photo_id }}">Update</button>
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>
@@ -57,37 +60,81 @@
                                         <span aria-hidden="true">&times;</span>
                                     </button>
                                 </div>
-                                <div class="modal-body" style="max-height: 400px; overflow-y: auto;">
-                                    {% if current_user.email == email or permissions.query.filter_by(photo_id=photo_id).first() %}
-                                        <form action="{{ url_for('photos.add_photo_description') }}" method="post">
-                                            <input type="hidden" name="photo_id" value="{{ photo_id }}">
-                                            <div class="form-group">
-                                                <div class="form-image">
-                                                    <img src="{{ photos_meta_data.baseUrl }}" alt="" width="200px" height="200px">
-                                                </div>
-
-                                                <label for="update-title">Add title:</label>
-                                                <input type="text" class="form-control" id="update-title" name="title" value="{{ photos_meta_data.title }}">
-                                                <label for="update-description">Add description:</label>
-                                                <textarea class="form-control" id="update-description" name="description" cols="30" rows="10">{{ photos_meta_data.description }}</textarea>
-                                                <label for="update-location">Add location:</label>
-                                                <input type="text" class="form-control" id="update-location" name="location" value="{{ photos_meta_data.location }}">
-                                                <label for="update-creation-date">Add date:</label>
-                                                <input type="date" class="form-control" id="update-creation-date" name="creation_date" value="{{ photos_meta_data.creation_data }}">
-                                            </div>
-                                            <button type="submit" class="btn btn-primary">Update</button>
-                                        </form>
-                                    {% else %}
-                                        <img src="{{ photos_meta_data.baseUrl }}" alt="Photo" width="200px" height="200px">
-                                        <h3>You don`t have a permission</h3>
-                                    {% endif %}
+                                <div class="modal-body" style="max-height: 600px; overflow-y: auto;">
+                                    <div class="form-image">
+                                        <img src="{{ photos_meta_data.baseUrl }}" alt="" width="200px" height="200px">
+                                    </div>
+                                    <form action="{{ url_for('photos.add_photo_description') }}" method="post">
+                                        <input type="hidden" name="photo_id" value="{{ photo_id }}">
+                                        <div class="form-group">
+                                            <label for="update-title">Add title:</label>
+                                            <input type="text" class="form-control" id="update-title" name="title" value="{{ photos_meta_data.title }}">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="update-description">Add description:</label>
+                                            <textarea class="form-control" id="update-description" name="description" cols="30" rows="10">{{ photos_meta_data.description }}</textarea>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="update-location">Add location:</label>
+                                            <input type="text" class="form-control" id="update-location" name="location" value="{{ photos_meta_data.location }}">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="update-creation-date">Add date:</label>
+                                            <input type="date" class="form-control" id="update-creation-date" name="creation_date" value="{{ photos_meta_data.creation_data }}">
+                                        </div>
+                                        <button type="submit" class="btn btn-primary">Update</button>
+                                    </form>
+                                    <button class="update-button btn" data-toggle="modal" data-dismiss="modal" data-target="#permissions-form-{{ photo_id }}">allow editing</button>
                                 </div>
                             </div>
                         </div>
                     </div>
+                    <div class="modal fade" id="permissions-form-{{ photo_id }}" tabindex="-1" role="dialog" aria-labelledby="updateFormLabel-{{ photo_id }}" aria-hidden="true">
+                      <div class="modal-dialog" role="document">
+                        <div class="modal-content">
+                          <div class="modal-header">
+                            <h5 class="modal-title" id="updateFormLabel-{{ photo_id }}">Allow Editing</h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                              <span aria-hidden="true">&times;</span>
+                            </button>
+                          </div>
+                          <form action="{{ url_for('photos.add_editing_permission') }}" method="post" class="my-4">
+                            <input type="hidden" name="photo_id" value="{{ photo_id }}">
+                            <div class="modal-body">
+                              <div class="form-content">
+                                <div class="form-row">
+                                  <div class="col">
+                                    <h3 class="allow-editing-label">Allow editing for:</h3>
+                                    <hr>
+                                    {% for family_user_email in family_users %}
+                                      {% if family_user_email %}
+                                        {% if current_user.email != family_user_email %}
+                                          {% if not permissions.query.filter_by(email=family_user_email, photo_id=photo_id).first() and family_user_email != email%}
+                                            <div class="form-check">
+                                              <input class="form-check-input" type="checkbox" id="email{{ loop.index }}" name="selected_users" value="{{ family_user_email }}">
+                                              <label class="form-check-label" for="email{{ loop.index }}">
+                                                {{ family_user_email }}
+                                              </label>
+                                            </div>
+                                          {% endif %}
+                                        {% endif %}
+                                      {% endif %}
+                                    {% endfor %}
+                                  </div>
+                                </div>
+                                <div class="form-row">
+                                  <button type="submit" class="btn btn-primary" style="margin-top: 10px">Allow</button>
+                                </div>
+                              </div>
+                            </div>
+                          </form>
+                        </div>
+                      </div>
+                    </div>
                 {% endfor %}
             {% endfor %}
         {% endfor %}
+        </div>
     {% else %}
         <h3>Please add photos to Phorever</h3>
     {% endif %}

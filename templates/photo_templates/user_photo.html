@@ -24,7 +24,7 @@
                     {% for id, urls in photo_data.items() %}
                         {% if urls %}
 
-                            <div class="photo-container mx-1 my-2 text-center" style="display: inline-block;">
+                            <div class="photo-container text-center" style="display: inline-block; margin-right: 5px; margin-bottom: 5px;">
                                 <a href="#" data-toggle="modal" data-target="#modal-{{ id }}">
                                     <img src="{{ urls }}" alt="Photo from {{ email }}" width="100px" height="100px">
                                 </a><br>
@@ -72,44 +72,48 @@
                                 </div>
 
                                 <div class="modal fade" id="update-form-{{ id }}" tabindex="-1" role="dialog" aria-labelledby="updateFormLabel-{{ id }}" aria-hidden="true">
-                                    <div class="modal-dialog" role="document">
-                                        <div class="modal-content">
-                                            <div class="modal-header">
-                                                <h5 class="modal-title" id="updateFormLabel-{{ id }}">Allow Editing</h5>
-                                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                                    <span aria-hidden="true">&times;</span>
-                                                </button>
-                                            </div>
-                                            <form action="{{ url_for('photos.add_editing_permission', photo_id=id) }}" method="post">
-                                                <div class="modal-body">
-                                                    <div class="form-content">
-                                                        <div class="form-inputs">
-                                                            <div class="form-row">
-                                                                <h3 class="allow-editing-label">Allow editing for:</h3>
-                                                                <hr>
-                                                                {% for email in family_users %}
-                                                                    {% if email %}
-                                                                        {% if current_user.email != email%}
-                                                                            {% if not permissions.query.filter_by(email=email).first() %}
-                                                                                <label class="user-checkbox" style="display: flex; align-items: center;">
-                                                                                    <span class="user-email" style="vertical-align: middle;">{{ email }}</span>
-                                                                                    <input type="checkbox" name="selected_users" value="{{ email }}" style="margin-left: 2px;"><br>
-                                                                                </label>
-                                                                            {% endif %}
-                                                                        {% endif %}
-                                                                    {% endif %}
-                                                                {% endfor %}
-                                                            </div>
-                                                            <div class="form-row">
-                                                                <input type="submit" value="Allow" class="allow-button">
-                                                            </div>
+                                  <div class="modal-dialog" role="document">
+                                    <div class="modal-content">
+                                      <div class="modal-header">
+                                        <h5 class="modal-title" id="updateFormLabel-{{ id }}">Allow Editing</h5>
+                                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                          <span aria-hidden="true">&times;</span>
+                                        </button>
+                                      </div>
+                                      <form action="{{ url_for('photos.add_editing_permission') }}" method="post" class="my-4">
+                                        <input type="hidden" name="photo_id" value="{{ id }}">
+                                        <div class="modal-body">
+                                          <div class="form-content">
+                                            <div class="form-row">
+                                              <div class="col">
+                                                <h3 class="allow-editing-label">Allow editing for:</h3>
+                                                <hr>
+                                                {% for family_user_email in family_users %}
+                                                  {% if family_user_email %}
+                                                    {% if current_user.email != family_user_email %}
+                                                      {% if not permissions.query.filter_by(email=family_user_email, photo_id=id).first() and family_user_email != email%}
+                                                        <div class="form-check">
+                                                          <input class="form-check-input" type="checkbox" id="email{{ loop.index }}" name="selected_users" value="{{ family_user_email }}">
+                                                          <label class="form-check-label" for="email{{ loop.index }}">
+                                                            {{ family_user_email }}
+                                                          </label>
                                                         </div>
-                                                    </div>
-                                                </div>
-                                            </form>
+                                                      {% endif %}
+                                                    {% endif %}
+                                                  {% endif %}
+                                                {% endfor %}
+                                              </div>
+                                            </div>
+                                            <div class="form-row">
+                                              <button type="submit" class="btn btn-primary" style="margin-top: 10px">Allow</button>
+                                            </div>
+                                          </div>
                                         </div>
+                                      </form>
                                     </div>
+                                  </div>
                                 </div>
+
                             {% else %}
                                 <div class="modal fade" id="modal-{{ id }}" tabindex="-1" role="dialog" aria-labelledby="modalLabel-{{ id }}" aria-hidden="true">
                                     <div class="modal-dialog" role="document">
@@ -135,6 +139,7 @@
                     {% endfor %}
                 {% endfor %}
                 </div>
+                <hr>
 {#                <hr>#}
             {% endfor %}
     {% else %}

@@ -1,7 +1,6 @@
 from flask_user import UserManager
 from src.app.Forms import RegisterForm, LoginForm
 from flask_login import LoginManager, login_user, current_user, logout_user
-from flask_bootstrap import Bootstrap
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask import *
 from src.app.model import db, Users
@@ -13,13 +12,11 @@ auth = Blueprint('auth', __name__, template_folder='../templates/auth_templates'
 
 login_manager = LoginManager()
 mail = Mail()
-bootstrap = Bootstrap()
 
 
 def init_login_app(app):
     login_manager.init_app(app)
     mail.init_app(app)
-    bootstrap.init_app(app)
     UserManager(app, db, Users)
 
 
@@ -113,7 +110,7 @@ def login():
         elif user.password and check_password_hash(user.password, password):
             login_user(user)
             current_user.is_authenticated = True
-            return redirect(request.args.get('next') or url_for('photos.user_photos'))
+            return redirect(request.args.get('next') or url_for('user_photos'))
         elif user and not user.is_verified:
             flash('Ваша электронная почта не была подтверждена. Проверьте свою почту и следуйте ин'
                   'струкциям, чтобы завершить регистрацию.')

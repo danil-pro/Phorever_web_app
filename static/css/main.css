@@ -12,6 +12,17 @@ h1 {
 .btn {
     background-color: #1CB038;
     color: aliceblue;
+    border-color: #1CB038;
 }
 
+.photo-container {
+    display: inline-block;
+    text-align: center;
+}
+
+.photo-content {
+    display: inline-block;
+    margin: 0 5px 0 5px;
+    text-align: center;
+}
 

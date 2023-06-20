@@ -38,8 +38,17 @@ class DBHandler:
                         response = drive.mediaItems().batchGet(mediaItemIds=chunk).execute()
                         for items in response['mediaItemResults']:
                             media_item = items['mediaItem']
+                            media_meta_data = media_item['mediaMetadata']
                             photo_id = Photos.query.filter_by(photos_data=media_item['id']).first()
-                            photo_url[photo_id.id] = media_item['baseUrl']
+                            if 'description' not in media_item:
+                                photo_url[photo_id.id] = {'baseUrl': media_item['baseUrl'],
+                                                          'description': '',
+                                                          'creationTime': media_meta_data['creationTime'].split('T')[0]}
+                            else:
+                                photo_url[photo_id.id] = {'baseUrl': media_item['baseUrl'],
+                                                          'description': media_item['description'],
+                                                          'creationTime': media_meta_data['creationTime'].split('T')[0]}
+
                     credentials['token'] = user_token
                     credentials['refresh_token'] = user_refresh_token
                     break
@@ -75,7 +84,6 @@ class DBHandler:
                           credentials=Credentials.from_authorized_user_info(credentials),
                           static_discovery=False)
             response = drive.mediaItems().get(mediaItemId=user_photo.photos_data).execute()
-            print(response)
             credentials['token'] = user_token
             credentials['refresh_token'] = user_refresh_token
             return response['baseUrl']

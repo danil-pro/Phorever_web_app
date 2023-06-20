@@ -2,6 +2,7 @@ from src.auth.auth import auth, init_login_app, current_user
 from src.oauth2.oauth2 import oauth2
 from src.photos.photo_handler import photos
 from src.app.config import *
+from src.app.Forms import UpdateForm
 from flask import *
 from google.oauth2.credentials import Credentials
 import requests
@@ -10,6 +11,7 @@ from src.photos.DBHandler import DBHandler
 from src.app.model import db, Photos, PhotosMetaData, EditingPermission, Users
 
 db_handler = DBHandler()
+
 
 def create_app():
     app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), '..', '..', 'templates'),
@@ -53,6 +55,7 @@ def user_photos():
     if current_user.is_authenticated:
         if 'credentials' not in session:
             return redirect(url_for('oauth2.google_authorize'))
+        form = UpdateForm(request.form)
         current_user_family = Users.query.filter_by(parent_id=current_user.parent_id).all()
         photo_url = []
         family_users = []
@@ -69,7 +72,7 @@ def user_photos():
             photo_url.append(dict_photo_data)
         return render_template('photo_templates/user_photo.html', photos=photo_url,
                                parent_id=current_user.parent_id, family_users=family_users,
-                               permissions=EditingPermission)
+                               permissions=EditingPermission, form=form)
     else:
         return redirect(url_for('auth.login'))
 
@@ -87,12 +90,12 @@ def google_verif():
 
 @app.route('/privacy')
 def privacy():
-    return '''<iframe src="https://phorever.cloud/privacy" width="100%" height="100%"></iframe>'''
+    return redirect('https://phorever.cloud/privacy')
 
 
-@app.route('/elua')
-def elua():
-    return '''<iframe src="https://phorever.cloud/elua" width="100%" height="100%"></iframe>'''
+@app.route('/eula')
+def eula():
+    return redirect('https://phorever.cloud/eula')
 
 
 @app.route('/robot.txt')

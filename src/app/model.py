@@ -25,8 +25,8 @@ class PhotosMetaData(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(100), nullable=True)
     description = db.Column(db.String(10000), nullable=True)
-    location = db.Column(db.String(1000), nullable=True)
-    creation_data = db.Column(db.String(10), nullable=True)
+    location = db.Column(db.String(100), nullable=True)
+    creation_data = db.Column(db.String(12), nullable=True)
     photo_id = db.Column(db.Integer, db.ForeignKey('photos.id'), nullable=False)
     photo = db.relationship('Photos', backref='metadata')
 

@@ -21,16 +21,13 @@
                 {% for email, photo_data in data.items() %}
                     <h5 class="text-center">Photo upload by : {{ email }}</h5><br>
                     <div class="d-flex justify-content-center flex-wrap">
-                    {% for id, urls in photo_data.items() %}
-                        {% if urls %}
+                    {% for id, data in photo_data.items() %}
+                        {% if data['baseUrl'] %}
 
                             <div class="photo-container text-center" style="display: inline-block; margin-right: 5px; margin-bottom: 5px;">
                                 <a href="#" data-toggle="modal" data-target="#modal-{{ id }}">
-                                    <img src="{{ urls }}" alt="Photo from {{ email }}" width="100px" height="100px">
+                                    <img src="{{ data['baseUrl'] }}" alt="Photo from {{ email }}" width="100px" height="100px">
                                 </a><br>
-{#                                <label>#}
-{#                                    <input type="checkbox" class="photo-checkbox" value="{{ id }}">Select Photo#}
-{#                                </label>#}
                             </div>
     {#                        остальной код #}
                             {% if current_user.email == email or permissions.query.filter_by(photo_id=id).first()%}
@@ -44,26 +41,32 @@
                                                 </button>
                                             </div>
                                             <div class="modal-body">
-                                                <img src="{{ urls }}" alt="Photo" width="200px" height="200px">
+                                                <img src="{{ data['baseUrl'] }}" alt="Photo" width="200px" height="200px">
                                                 <form action="{{ url_for('photos.add_photo_description') }}" method="post">
                                                     <input type="hidden" name="photo_id" value="{{ id }}">
+                                                    {% if form.csrf_token %}
+                                                        {{ form.csrf_token }}
+                                                    {% endif %}
                                                     <div class="form-group">
                                                         <label for="update-title">Add title:</label>
-                                                        <input type="text" class="form-control" id="update-title" name="title" value="">
+                                                        {{ form.title }}
                                                     </div>
                                                     <div class="form-group">
                                                         <label for="update-description">Add description:</label>
-                                                        <textarea class="form-control" id="update-description" name="description" cols="30" rows="10"></textarea>
+                                                        <textarea class="form-control" id="update-description" maxlength="10000" name="description" cols="30" rows="10">{{ data['description'] }}</textarea>
                                                     </div>
                                                     <div class="form-group">
                                                         <label for="update-location">Add location:</label>
-                                                        <input type="text" class="form-control" id="update-location" name="location" value="">
+                                                        {{ form.location }}
+{#                                                        <input type="text" class="form-control" id="update-location" name="location" value="">#}
                                                     </div>
                                                     <div class="form-group">
                                                         <label for="update-creation-date">Add date:</label>
-                                                        <input type="date" class="form-control" id="update-creation-date" name="creation_date" value="">
+                                                        {{ form.creation_date(value=data['creationTime']) }}
+{#                                                        <input type="date" class="form-control" id="update-creation-date" name="creation_date" value="{{ data['creationTime'] }}">#}
                                                     </div>
-                                                    <input type="submit" class="btn" value="Phorever">
+                                                    {{ form.submit }}
+{#                                                    <input type="submit" class="btn" value="Phorever">#}
                                                 </form>
                                                 <button class="update-button btn" data-toggle="modal" data-dismiss="modal" data-target="#update-form-{{ id }}">allow editing</button>
                                             </div>
@@ -125,7 +128,7 @@
                                                 </button>
                                             </div>
                                             <div class="modal-body">
-                                                <img src="{{ urls }}" alt="Photo" width="200px" height="200px">
+                                                <img src="{{ data['baseUrl'] }}" alt="Photo" width="200px" height="200px">
                                                 <h3>You don`t have a permission</h3>
                                             </div>
                                         </div>
@@ -140,7 +143,6 @@
                 {% endfor %}
                 </div>
                 <hr>
-{#                <hr>#}
             {% endfor %}
     {% else %}
         <h2>Please select a photo from the offered services</h2><br>

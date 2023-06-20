@@ -1,51 +1,29 @@
-document.addEventListener("DOMContentLoaded", function() {
-  const modals = document.querySelectorAll(".modal");
-  const closeButtons = document.querySelectorAll(".close-button");
-  const UpdateCloseButtons = document.querySelectorAll(".update-close-button");
-  const updateButtons = document.querySelectorAll(".update-button");
-  let openedModal = null;
+$(document).ready(function() {
+    $('.photo-checkbox').change(function() {
+        var anyChecked = false;
+        $('.photo-checkbox').each(function() {
+            if ($(this).is(':checked')) {
+                anyChecked = true;
+                return false;
+            }
+        });
 
-  modals.forEach(function(modal) {
-    const target = document.getElementById(modal.dataset.target);
-
-    modal.addEventListener("click", function() {
-      if (openedModal) {
-        return; // Если есть открытое окно, выходим из функции
-      }
-
-      target.style.display = "block";
-      openedModal = target;
+        if (anyChecked) {
+            $('.fixed-menu').show();
+        } else {
+            $('.fixed-menu').hide();
+        }
     });
-  });
-
-  closeButtons.forEach(function(closeButton) {
-    closeButton.addEventListener("click", function() {
-      const modalContent = closeButton.closest(".modal-content");
-      modalContent.style.display = "none";
-      openedModal = null; // Сбрасываем открытое окно
-    });
-  });
-
-  UpdateCloseButtons.forEach(function(UpdateCloseButtons) {
-    UpdateCloseButtons.addEventListener("click", function() {
-      const UpdateFormContent = UpdateCloseButtons.closest(".update-form");
-      UpdateFormContent.style.display = "none";
-      openedModal = null; // Сбрасываем открытое окно
-    });
-  });
-
-  updateButtons.forEach(function(updateButton) {
-    updateButton.addEventListener("click", function() {
-      const modalContent = updateButton.closest(".modal-content");
-      const photoId = modalContent.id.split("-")[1]; // Получаем ID фотографии из ID модального окна
-      const updateForm = document.getElementById("update-form-" + photoId);
-
-      modalContent.style.display = "none";
-      updateForm.style.display = "block";
-    });
-  });
 });
 
-
+$(document).ready(function() {
+    $('input[type="checkbox"]').change(function() {
+      var selectedValues = [];
+      $('input[type="checkbox"]:checked').each(function() {
+        selectedValues.push($(this).val());
+      });
+      $('.hidden_selected_photos').val(selectedValues.join(','));
+    });
+});
 
 

@@ -8,10 +8,11 @@ from dropbox.exceptions import AuthError
 import dropbox
 from dropbox import files, sharing
 
-from src.app.config import *
+# from src.app.config import *
 from src.app.model import db, Photos, Users, PhotosMetaData, EditingPermission
 from src.photos.DBHandler import DBHandler
 from src.oauth2.oauth2 import authenticator
+from src.app.Forms import UpdateForm, UpdateLocationForm, UpdateCreationDateForm
 
 import asyncio
 
@@ -127,38 +128,70 @@ async def dropbox_photos():
     return redirect(url_for('auth.login'))
 
 
+@photos.route('/update_media_meta_data', methods=['GET', 'POST'])
+def update_media_meta_data():
+    if current_user.is_authenticated:
+        if 'credentials' not in session:
+            return redirect(url_for('oauth2.google_authorize'))
+        location_form = UpdateLocationForm(request.form)
+        creation_date_form = UpdateCreationDateForm(request.form)
+        if request.method == "POST":
+            if location_form.validate_on_submit() or creation_date_form.validate_on_submit():
+                selected_photos = request.form['selected_photos']
+                location = request.form['location']
+                creation_date = request.form['creation_date']
+
+                if selected_photos:
+                    photo_ids = [int(x) for x in selected_photos.split(',')]
+                    if location:
+                        for photo_id in photo_ids:
+                            photo_meta_data = PhotosMetaData.query.filter_by(photo_id=photo_id).first()
+                            photo_meta_data.location = location_form.location.data
+                            db.session.add(photo_meta_data)
+                        db.session.commit()
+                        flash('Update successful')
+                    if creation_date:
+                        for photo_id in photo_ids:
+                            photo_meta_data = PhotosMetaData.query.filter_by(photo_id=photo_id).first()
+                            photo_meta_data.creation_data = creation_date_form.creation_date.data
+                            db.session.add(photo_meta_data)
+                        db.session.commit()
+                        flash('Update successful')
+                return redirect(url_for('photos.photos_tree'))
+
+        return redirect(url_for('photos.photos_tree'))
+    else:
+        return redirect(url_for('auth.login'))
+
+
 @photos.route('/add_photo_description', methods=['GET', 'POST'])
 def add_photo_description():
     if current_user.is_authenticated:
         if 'credentials' not in session:
             return redirect(url_for('oauth2.google_authorize'))
-
-        if request.method == "POST":
-
-            title = request.form['title']
+        form = UpdateForm(request.form)
+        if request.method == "POST" and form.validate_on_submit():
             description = request.form['description']
-            location = request.form['location']
-            creation_data = request.form['creation_date']
             photo_id = request.form['photo_id']
 
             photo_meta_data = PhotosMetaData.query.filter_by(photo_id=photo_id).first()
 
             if not photo_meta_data:
-                new_photo_meta_data = PhotosMetaData(title=title, description=description,
-                                                     location=location, creation_data=creation_data,
+                new_photo_meta_data = PhotosMetaData(title=form.title.data, description=description,
+                                                     location=form.location.data, creation_data=form.creation_date.data,
                                                      photo_id=photo_id)
                 db.session.add(new_photo_meta_data)
                 db.session.commit()
                 flash('Photo add to tree successful')
             else:
-                if title:
-                    photo_meta_data.title = title
+                if form.title.data:
+                    photo_meta_data.title = form.title.data
                 if description:
                     photo_meta_data.description = description
-                if location:
-                    photo_meta_data.location = location
-                if creation_data:
-                    photo_meta_data.creation_data = creation_data
+                if form.location.data:
+                    photo_meta_data.location = form.location.data
+                if form.creation_date.data:
+                    photo_meta_data.creation_data = form.creation_date.data
 
                 db.session.commit()
                 flash('Update successful')
@@ -174,7 +207,9 @@ def add_editing_permission():
     if current_user.is_authenticated:
         if 'credentials' not in session:
             return redirect(url_for('oauth2.google_authorize'))
+
         if request.method == "POST":
+
             photos_data = request.form.getlist('selected_users')
             photo_id = request.form['photo_id']
             for email in photos_data:
@@ -192,6 +227,9 @@ def photos_tree():
     if current_user.is_authenticated:
         if 'credentials' not in session:
             return redirect(url_for('oauth2.google_authorize'))
+        form = UpdateForm(request.form)
+        location_form = UpdateLocationForm(request.form)
+        creation_date_form = UpdateCreationDateForm(request.form)
         current_user_family = Users.query.filter_by(parent_id=current_user.parent_id).all()
         photo_data = []
         family_users = []
@@ -207,8 +245,9 @@ def photos_tree():
                                                                       'description': photos_meta_data.description,
                                                                       'location': photos_meta_data.location,
                                                                       'creation_data': photos_meta_data.creation_data}}})
-        print(photo_data)
         return render_template('photo_templates/photos_tree.html',
-                               photo_data=photo_data, permissions=EditingPermission, family_users=family_users)
+                               photo_data=photo_data, permissions=EditingPermission,
+                               family_users=family_users, form=form, location_form=location_form,
+                               creation_date_form=creation_date_form)
     else:
         return redirect(url_for('auth.login'))

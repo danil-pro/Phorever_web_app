@@ -26,3 +26,17 @@ h1 {
     text-align: center;
 }
 
+.fixed-menu {
+    display: none;
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.fixed-menu button {
+    background-color: #1CB038;
+    border: #1CB038;
+    color: aliceblue;
+    padding: 10px;
+}

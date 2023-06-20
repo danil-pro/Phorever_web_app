@@ -15,18 +15,81 @@
         {% for data in photo_data %}
             {% for email, photos in data.items() %}
                 {% for photo_id, photos_meta_data in photos.items() %}
-                    <div class="photo-content text-center" data-toggle="modal" data-target="#modal-{{ photo_id }}">
-                        <img src="{{ photos_meta_data.baseUrl }}" alt="" width="100px" height="100px"><br>
-                        {% if photos_meta_data.title|length > 10 %}
-                            <label>{{ photos_meta_data.title[:10] }}...</label><br>
-                        {% else %}
-                            <label>{{ photos_meta_data.title }}</label><br>
+                    <div class="photo-content text-center">
+                        <div class="content" data-toggle="modal" data-target="#modal-{{ photo_id }}">
+                            <img src="{{ photos_meta_data['baseUrl'].baseUrl }}" alt="" width="100px" height="100px"><br>
+                            {% if photos_meta_data.title|length > 10 %}
+                                <label>{{ photos_meta_data.title[:10] }}...</label><br>
+                            {% else %}
+                                <label>{{ photos_meta_data.title }}</label><br>
+                            {% endif %}
+                            {% if photos_meta_data.description|length > 10 %}
+                                <label>{{ photos_meta_data.description[:10] }}...</label><br>
+                            {% else %}
+                                <label>{{ photos_meta_data.description }}</label><br>
+                            {% endif %}
+                        </div>
+                        {% if current_user.email == email or permissions.query.filter_by(photo_id=photo_id).first()%}
+                            <label for="">
+                                <input type="checkbox" class="photo-checkbox" value="{{ photo_id }}">
+                                Select Photo
+                            </label>
                         {% endif %}
-                        {% if photos_meta_data.description|length > 10 %}
-                            <label>{{ photos_meta_data.description[:10] }}...</label><br>
-                        {% else %}
-                            <label>{{ photos_meta_data.description }}</label><br>
-                        {% endif %}
+                    </div>
+                    <div class="fixed-menu">
+                        <button class="btn" data-toggle="modal" data-dismiss="modal" data-target="#update_location_modal">Update location</button>
+                        <button class="btn" data-toggle="modal" data-dismiss="modal" data-target="#update_creation_data_modal">Update creation data</button>
+                    </div>
+                    <div class="modal fade" id="update_location_modal" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
+                        <form action="{{ url_for('photos.update_media_meta_data') }}" method="POST">
+                            <input type="hidden" name="selected_photos" class="hidden_selected_photos">
+                            <input type="hidden" name="creation_date">
+                            {% if location_form.csrf_token %}
+                                {{ location_form.csrf_token }}
+                            {% endif %}
+                            <div class="modal-dialog" role="document">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                            <span aria-hidden="true">&times;</span>
+                                        </button>
+                                    </div>
+                                    <div class="modal-body overflow-auto text-center">
+                                      <div class="form-group">
+                                        <label for="exampleInputEmail1">Update location</label>
+                                          {{ location_form.location }}
+{#                                        <input type="text" class="form-control" name="location" id="exampleInputEmail1" aria-describedby="emailHelp" placeholder="Update location">#}
+                                      </div>
+                                    {{ location_form.submit }}
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal fade" id="update_creation_data_modal" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
+                        <form action="{{ url_for('photos.update_media_meta_data') }}" method="POST">
+                            <input type="hidden" name="selected_photos" class="hidden_selected_photos">
+                            <input type="hidden" name="location">
+                            {% if creation_date_form.csrf_token %}
+                                {{ creation_date_form.csrf_token }}
+                            {% endif %}
+                            <div class="modal-dialog" role="document">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                            <span aria-hidden="true">&times;</span>
+                                        </button>
+                                    </div>
+                                    <div class="modal-body overflow-auto text-center">
+                                      <div class="form-group">
+                                        <label for="exampleInputEmail1">Update creation date</label>
+                                          {{ creation_date_form.creation_date }}
+                                      </div>
+                                      {{ creation_date_form.submit }}
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
                     </div>
                     <div class="modal fade" id="modal-{{ photo_id }}" tabindex="-1" role="dialog" aria-labelledby="modalLabel-{{ photo_id }}" aria-hidden="true">
                         <div class="modal-dialog" role="document">
@@ -37,8 +100,8 @@
                                         <span aria-hidden="true">&times;</span>
                                     </button>
                                 </div>
-                                <div class="modal-body overflow-auto">
-                                    <img src="{{ photos_meta_data.baseUrl }}" alt="" width="200px" height="200px"><br>
+                                <div class="modal-body overflow-auto text-center">
+                                    <img src="{{ photos_meta_data['baseUrl'].baseUrl }}" alt="" width="200px" height="200px"><br>
                                     <h2>{{ photos_meta_data.title }}</h2>
                                     <p>{{ photos_meta_data.description }}</p>
                                     <p>{{ photos_meta_data.location }}</p>
@@ -60,29 +123,36 @@
                                         <span aria-hidden="true">&times;</span>
                                     </button>
                                 </div>
-                                <div class="modal-body" style="max-height: 600px; overflow-y: auto;">
+                                <div class="modal-body text-center" style="max-height: 600px; overflow-y: auto;">
                                     <div class="form-image">
-                                        <img src="{{ photos_meta_data.baseUrl }}" alt="" width="200px" height="200px">
+                                        <img src="{{ photos_meta_data['baseUrl'].baseUrl }}" alt="" width="200px" height="200px">
                                     </div>
-                                    <form action="{{ url_for('photos.add_photo_description') }}" method="post">
+                                    <form action="{{ url_for('photos.add_photo_description') }}" method="POST">
                                         <input type="hidden" name="photo_id" value="{{ photo_id }}">
+                                        {% if form.csrf_token %}
+                                            {{ form.csrf_token }}
+                                        {% endif %}
                                         <div class="form-group">
                                             <label for="update-title">Add title:</label>
-                                            <input type="text" class="form-control" id="update-title" name="title" value="{{ photos_meta_data.title }}">
+                                            {{ form.title(value=photos_meta_data.title) }}
+{#                                            <input type="text" class="form-control" id="update-title" name="title" value="{{ photos_meta_data.title }}">#}
                                         </div>
                                         <div class="form-group">
                                             <label for="update-description">Add description:</label>
-                                            <textarea class="form-control" id="update-description" name="description" cols="30" rows="10">{{ photos_meta_data.description }}</textarea>
+                                            <textarea class="form-control" id="update-description" maxlength="10000" name="description" cols="30" rows="10">{{ photos_meta_data.description }}</textarea>
                                         </div>
                                         <div class="form-group">
                                             <label for="update-location">Add location:</label>
-                                            <input type="text" class="form-control" id="update-location" name="location" value="{{ photos_meta_data.location }}">
+                                            {{ form.location(value=photos_meta_data.location) }}
+{#                                            <input type="text" class="form-control" id="update-location" name="location" value="{{ photos_meta_data.location }}">#}
                                         </div>
                                         <div class="form-group">
                                             <label for="update-creation-date">Add date:</label>
-                                            <input type="date" class="form-control" id="update-creation-date" name="creation_date" value="{{ photos_meta_data.creation_data }}">
+                                            {{ form.creation_date(value=photos_meta_data.creation_data) }}
+{#                                            <input type="date" class="form-control" id="update-creation-date" name="creation_date" value="{{ photos_meta_data.creation_data }}">#}
                                         </div>
-                                        <button type="submit" class="btn btn-primary">Update</button>
+                                        {{ form.submit }}
+{#                                        <button type="submit" class="btn btn-primary">Update</button>#}
                                     </form>
                                     <button class="update-button btn" data-toggle="modal" data-dismiss="modal" data-target="#permissions-form-{{ photo_id }}">allow editing</button>
                                 </div>

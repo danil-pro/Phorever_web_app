@@ -177,3 +177,6 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 >>>>>>> 907e6c2 (first commit)
+
+Pipfile
+Pipfile.lock

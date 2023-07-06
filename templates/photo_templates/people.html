@@ -1,0 +1,26 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+{% with messages = get_flashed_messages() %}
+    {% if messages %}
+        {% for msg in messages %}
+            <p>{{ msg }}</p>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+    {% for face in faces %}
+        <div>
+            {% for photo_id, metadata in face.items() %}
+                <div class="photo-content text-center">
+                    <div class="content">
+                        <img src="{{ metadata.baseUrl }}" height="150px" alt="">
+                        <div class="photo_data bg-light">
+
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div><br>
+        <hr>
+    {% endfor %}
+{% endblock %}

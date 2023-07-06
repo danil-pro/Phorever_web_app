@@ -21,14 +21,11 @@
           </button>
           <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav">
-              <li class="nav-item active" >
-                <a class="nav-link" href="{{ url_for('photos.photos_tree') }}" style="color:#1CB038; font-family: sans-serif">Family tree</a>
+              <li class="nav-item active">
+                <a class="nav-link" href="{{ url_for('photos.people') }}" style="color:#1CB038; font-family: sans-serif">People</a>
               </li>
               <li class="nav-item active">
-                <a class="nav-link" href="{{ url_for('photos.google_photos') }}" style="color:#1CB038; font-family: sans-serif">Google Photo</a>
-              </li>
-              <li class="nav-item active">
-                <a class="nav-link" href="{{ url_for('photos.dropbox_photos') }}" style="color:#1CB038; font-family: sans-serif">Dropbox</a>
+                <a class="nav-link" href="{{ url_for('user_photos') }}" style="color:#1CB038; font-family: sans-serif">Your Photo</a>
               </li>
                 {% if not current_user.is_authenticated %}
                   <li class="nav-item active">
@@ -46,6 +43,7 @@
           </div>
         </nav>
     </header>
+
     <main class="flex-fill">
         {% block content %}
         {% endblock %}

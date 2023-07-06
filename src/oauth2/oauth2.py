@@ -6,6 +6,13 @@ from google_auth_oauthlib.flow import Flow
 
 from src.app.config import *
 from src.oauth2.Oauth2_Connector import GoogleOauth2Connect, DropboxOauth2Connect
+from src.app.Forms import IcloudLoginForm, VerifyVerificationCodeForm, ICloudVerifyForm
+from src.app.model import Users, db
+
+import keyring
+from pyicloud import PyiCloudService
+from pyicloud.exceptions import PyiCloudFailedLoginException
+
 
 oauth2 = Blueprint('oauth2', __name__, template_folder='../templates', static_folder='../static')
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -80,7 +87,6 @@ def dropbox_authorize():
 def dropbox_oauth2callback():
     try:
         session['access_token'], session['user_id'] = authenticator.finish_auth(request.args)
-        print(session)
     except Exception as e:
         print(e)
         return redirect(url_for('index'))
@@ -97,3 +103,89 @@ def dropbox_logout():
             authorize_url = authenticator.start_auth()
             return flask.redirect(authorize_url)
     return redirect(url_for('auth.login'))
+
+
+@oauth2.route('/icloud_authorize', methods=['GET', 'POST'])
+def icloud_authorize():
+    if current_user.is_authenticated:
+        form = IcloudLoginForm()
+        if request.method == 'POST' and form.validate():
+            try:
+                icloud_user = keyring.get_password("pyicloud", form.apple_id.data)
+                session['icloud_credentials'] = {'apple_id': form.apple_id.data}
+                if not icloud_user:
+                    api = PyiCloudService(form.apple_id.data, form.password.data)
+                    session['icloud_credentials'] = {'apple_id': form.apple_id.data}
+                    keyring.set_password("pyicloud", form.apple_id.data, form.password.data)
+
+                    if api.requires_2fa:
+                        return redirect(url_for('oauth2.icloud_verify_2fa'))
+                    elif api.requires_2sa:
+                        return redirect(url_for('oauth2.icloud_verify_2sa', apple_id=form.apple_id.data))
+                    else:
+                        return redirect(url_for('photos.icloud_photos'))
+                else:
+                    session['icloud_credentials'] = {'apple_id': form.apple_id.data}
+                    return redirect(url_for('photos.icloud_photos'))
+
+            except PyiCloudFailedLoginException:
+                flash('invalid login')
+                return redirect(url_for('oauth2.icloud_authorize'))
+
+        return render_template('oauth_templates/icloud_login.html', form=form)
+
+    return redirect(url_for('auth.login'))
+
+
+@oauth2.route('/icloud_verify_2fa', methods=['GET', 'POST'])
+def icloud_verify_2fa():
+    form = VerifyVerificationCodeForm()
+
+    if form.validate_on_submit():
+        verification_code = form.code.data
+        icloud_password = keyring.get_password("pyicloud", session['icloud_credentials']['apple_id'])
+        api = PyiCloudService(session['icloud_credentials']['apple_id'], icloud_password)
+        result = api.validate_2fa_code(verification_code)
+        if not result:
+            flash('Invalid verification code')
+            return redirect(url_for('oauth2.icloud_verify_2fa'))
+
+        if not api.is_trusted_session:
+            result = api.trust_session()
+            if not result:
+                flash('Failed to request trust. You will likely be prompted for the code again in the coming weeks')
+                return redirect(url_for('oauth2.icloud_verify_2fa'))
+        return redirect(url_for('photos.icloud_photos'))
+
+    return render_template('oauth_templates/icloud_verify_2fa.html', form=form)
+
+
+@oauth2.route('/icloud_verify_2sa', methods=['GET', 'POST'])
+def icloud_verify_2sa():
+    form = ICloudVerifyForm()
+
+    if form.validate_on_submit():
+        security_code = form.code.data
+        icloud_password = keyring.get_password("pyicloud", session['icloud_credentials']['apple_id'])
+        api = PyiCloudService(session['icloud_credentials']['apple_id'], icloud_password)
+        devices = api.trusted_devices
+        device_list = []
+        for i, device in enumerate(devices):
+            device_name = device.get('deviceName', "SMS to %s" % device.get('phoneNumber'))
+            device_list.append((i, device_name))
+        device_index = int(security_code)
+        device = devices[device_index]
+
+        if not api.send_verification_code(device):
+            flash('Failed to send verification code')
+            return redirect(url_for('oauth2.icloud_verify_2sa'))
+
+        if not api.validate_verification_code(device, security_code):
+            flash('Failed to verify verification code')
+            return redirect(url_for('oauth2.icloud_verify_2sa'))
+
+        # Логика для обработки успешной верификации 2SA
+        return redirect(url_for('photos.icloud_photos'))
+
+    return render_template('oauth_templates/icloud_verify_2sa.html', form=form)
+

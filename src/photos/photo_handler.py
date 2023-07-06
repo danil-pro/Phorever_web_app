@@ -1,3 +1,6 @@
+import json
+import pickle
+
 import flask
 from flask import *
 from src.auth.auth import current_user
@@ -9,7 +12,7 @@ import dropbox
 from dropbox import files, sharing
 
 # from src.app.config import *
-from src.app.model import db, Photos, Users, PhotosMetaData, EditingPermission
+from src.app.model import db, Photos, Users, PhotosMetaData, EditingPermission, FaceEncode
 from src.photos.DBHandler import DBHandler
 from src.oauth2.oauth2 import authenticator
 from src.app.Forms import UpdateForm, UpdateLocationForm, UpdateCreationDateForm
@@ -17,6 +20,12 @@ from src.app.Forms import UpdateForm, UpdateLocationForm, UpdateCreationDateForm
 import asyncio
 
 import src.photos.Get_photos_from_API
+import numpy as np
+import json
+from pyicloud import PyiCloudService
+import keyring
+from pyicloud.exceptions import PyiCloudNoStoredPasswordAvailableException
+
 
 photos = Blueprint('photos', __name__, template_folder='../templates/photo_templates', static_folder='../static')
 
@@ -66,12 +75,32 @@ def add_photo():
         if request.method == 'POST':
             photos_data = request.form.getlist('selected_photos')
             source_function = request.form.get('source_function')
-
+            # download_photos = db_handler.download_photos(session['credentials'], photos_data)
+            # face_encode_handler = db_handler.face_encode_handler(download_photos)
             for photo_data in photos_data:
-                photo = Photos(photos_data=photo_data, service=source_function, token=session['credentials']['token'],
-                               refresh_token=session['credentials']['refresh_token'], user_id=current_user.id)
-                db.session.add(photo)
+                if source_function == '/photos/google_photos':
+                    photo = Photos(photos_data=photo_data, service=source_function,
+                                   token=session['credentials']['token'],
+                                   refresh_token=session['credentials']['refresh_token'],
+                                   apple_id=None,
+                                   user_id=current_user.id)
+                    db.session.add(photo)
+                elif source_function == '/photos/icloud_photos':
+                    photo = Photos(photos_data=photo_data, service=source_function,
+                                   token=None,
+                                   refresh_token=None,
+                                   apple_id=session['icloud_credentials']['apple_id'],
+                                   user_id=current_user.id)
+                    db.session.add(photo)
             db.session.commit()
+            # for photo_id, face_encode in face_encode_handler.items():
+            #     photo = Photos.query.filter_by(photos_data=photo_id).first()
+            #     for faces in face_encode:
+            #         face = FaceEncode(face_encode=faces,
+            #                           photo_id=photo.id, user_id=current_user.id)
+            #         db.session.add(face)
+            #     db.session.commit()
+
             return redirect(url_for('user_photos'))
     return redirect(url_for('auth.login'))
 
@@ -128,6 +157,33 @@ async def dropbox_photos():
     return redirect(url_for('auth.login'))
 
 
+@photos.route('/icloud_photos', methods=['GET', 'POST'])
+def icloud_photos():
+    if current_user.is_authenticated:
+        if 'icloud_credentials' not in session:
+            return redirect(url_for('oauth2.icloud_authorize'))
+        try:
+            icloud_password = keyring.get_password("pyicloud", session['icloud_credentials']['apple_id'])
+            api = PyiCloudService(session['icloud_credentials']['apple_id'], icloud_password)
+            photo_ids = set()  # Множество для хранения уникальных идентификаторов фотографий
+            data_url = []
+
+            for photo in api.photos.albums['All Photos']:
+                for version, data in photo.versions.items():
+                    if data['type'] == 'public.jpeg' and photo.id not in photo_ids:
+                        data_url.append({photo.id: data['url']})
+                        photo_ids.add(photo.id)
+
+            return render_template('photo_templates/img.html', base_url=data_url,
+                                   source_function=url_for('photos.icloud_photos'))
+
+        except PyiCloudNoStoredPasswordAvailableException:
+            flash('invalid password')
+            return redirect(url_for('oauth2.icloud_authorize'))
+
+    return redirect(url_for('auth.login'))
+
+
 @photos.route('/update_media_meta_data', methods=['GET', 'POST'])
 def update_media_meta_data():
     if current_user.is_authenticated:
@@ -146,20 +202,37 @@ def update_media_meta_data():
                     if location:
                         for photo_id in photo_ids:
                             photo_meta_data = PhotosMetaData.query.filter_by(photo_id=photo_id).first()
-                            photo_meta_data.location = location_form.location.data
-                            db.session.add(photo_meta_data)
+                            if not photo_meta_data:
+                                new_photo_meta_data = PhotosMetaData(title='Empty title',
+                                                                     description='Empty description',
+                                                                     location=location_form.location.data,
+                                                                     photo_id=photo_id)
+                                db.session.add(new_photo_meta_data)
+                                db.session.commit()
+                            else:
+                                photo_meta_data.location = location_form.location.data
+                                db.session.add(photo_meta_data)
                         db.session.commit()
                         flash('Update successful')
                     if creation_date:
                         for photo_id in photo_ids:
                             photo_meta_data = PhotosMetaData.query.filter_by(photo_id=photo_id).first()
-                            photo_meta_data.creation_data = creation_date_form.creation_date.data
-                            db.session.add(photo_meta_data)
+                            if not photo_meta_data:
+                                new_photo_meta_data = PhotosMetaData(title='Empty title',
+                                                                     description='Empty description',
+                                                                     location='Empty location',
+                                                                     creation_data=creation_date_form.creation_date.data,
+                                                                     photo_id=photo_id)
+                                db.session.add(new_photo_meta_data)
+                                db.session.commit()
+                            else:
+                                photo_meta_data.creation_data = creation_date_form.creation_date.data
+                                db.session.add(photo_meta_data)
                         db.session.commit()
                         flash('Update successful')
-                return redirect(url_for('photos.photos_tree'))
+                return redirect(url_for('user_photos'))
 
-        return redirect(url_for('photos.photos_tree'))
+        return redirect(url_for('user_photos'))
     else:
         return redirect(url_for('auth.login'))
 
@@ -196,7 +269,7 @@ def add_photo_description():
                 db.session.commit()
                 flash('Update successful')
 
-        return redirect(url_for('photos.photos_tree'))
+        return redirect(url_for('user_photos'))
 
     else:
         return redirect(url_for('auth.login'))
@@ -222,32 +295,28 @@ def add_editing_permission():
         return redirect(url_for('auth.login'))
 
 
-@photos.route('/photos_tree', methods=['GET', 'POST'])
-def photos_tree():
+@photos.route('/people', methods=['GET', 'POST'])
+def people():
     if current_user.is_authenticated:
         if 'credentials' not in session:
             return redirect(url_for('oauth2.google_authorize'))
-        form = UpdateForm(request.form)
-        location_form = UpdateLocationForm(request.form)
-        creation_date_form = UpdateCreationDateForm(request.form)
         current_user_family = Users.query.filter_by(parent_id=current_user.parent_id).all()
-        photo_data = []
-        family_users = []
+        face_encode = []
         for family_user in current_user_family:
-            family_users.append(family_user.email)
-            family_user_photos = Photos.query.filter_by(user_id=family_user.id).all()
-            photo_urls = db_handler.get_photos_from_db(family_user_photos, session['credentials'])
-            for photo_id, url in photo_urls.items():
-                photos_meta_data = PhotosMetaData.query.filter_by(photo_id=photo_id).first()
-                if photos_meta_data:
-                    photo_data.append({family_user.email: {photo_id: {'baseUrl': url,
-                                                                      'title': photos_meta_data.title,
-                                                                      'description': photos_meta_data.description,
-                                                                      'location': photos_meta_data.location,
-                                                                      'creation_data': photos_meta_data.creation_data}}})
-        return render_template('photo_templates/photos_tree.html',
-                               photo_data=photo_data, permissions=EditingPermission,
-                               family_users=family_users, form=form, location_form=location_form,
-                               creation_date_form=creation_date_form)
+            people_face = FaceEncode.query.filter_by(user_id=family_user.id).all()
+            for face in people_face:
+                decoded_face = pickle.loads(face.face_encode)
+                face_encode.append({face.photo_id: decoded_face})
+        family_face_recognition = db_handler.face_recognition_handler(face_encode)
+        faces = []
+        for i in family_face_recognition:
+            for _, photo_ids in i.items():
+                family_user_photos = []
+                for photo_id in photo_ids:
+                    family_user_photos.append(Photos.query.filter_by(id=photo_id).first())
+                faces.append(db_handler.get_photos_from_db(family_user_photos, session['credentials']))
+
+        return render_template('photo_templates/people.html', faces=faces)
     else:
         return redirect(url_for('auth.login'))
+

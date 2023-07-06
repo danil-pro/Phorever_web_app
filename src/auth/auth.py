@@ -61,6 +61,7 @@ def register(parent_token=None):
         new_user.parent_token = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
         new_user.token = None
         new_user.refresh_token = None
+        new_user.apple_id = None
         db.session.add(new_user)
         db.session.commit()
         send_email(form.email.data, '', f'''Для подтверждения своей электронной почты, пожалуйста, посетите следующую ссылку:

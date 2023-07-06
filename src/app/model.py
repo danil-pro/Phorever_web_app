@@ -12,6 +12,7 @@ class Users(db.Model, UserMixin):
     verification_token = db.Column(db.String(10), unique=True, nullable=True)
     parent_token = db.Column(db.String(10), nullable=True)
     parent_id = db.Column(db.Integer, nullable=True)
+    apple_id = db.Column(db.String(256), nullable=True)
 
     def __init__(self, email, password):
         self.email = email
@@ -37,11 +38,20 @@ class Photos(db.Model):
     service = db.Column(db.String(32), nullable=False)
     token = db.Column(db.String(300), nullable=True)
     refresh_token = db.Column(db.String(300), nullable=True)
+    apple_id = db.Column(db.String(300), nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     users = db.relationship('Users', secondary='editing_permission', backref='photos')
 
     def __repr__(self):
         return f'<Photo {self.id}>'
+
+
+class FaceEncode(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    face_encode = db.Column(db.LargeBinary, nullable=True)
+    photo_id = db.Column(db.Integer, db.ForeignKey('photos.id'), nullable=False)
+    photo = db.relationship('Photos', backref='face_encode')
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
 
 
 class EditingPermission(db.Model):

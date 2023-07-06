@@ -1,3 +1,5 @@
+* { box-sizing: border-box; }
+
 a {
     color: #1CB038;
     text-align: center;
@@ -18,13 +20,28 @@ h1 {
 .photo-container {
     display: inline-block;
     text-align: center;
+    margin-right: 1px; margin-bottom: 5px;
 }
 
 .photo-content {
     display: inline-block;
-    margin: 0 5px 0 5px;
     text-align: center;
+    margin-right: 1px; margin-bottom: 5px;
 }
+.content{
+    text-align: center;
+    margin-right: 1px; margin-bottom: 5px;
+}
+
+.content img{
+    width: 100%;
+}
+
+.photo_data{
+    width: 100%;
+    padding: 10px;
+}
+
 
 .fixed-menu {
     display: none;
@@ -40,3 +57,26 @@ h1 {
     color: aliceblue;
     padding: 10px;
 }
+
+.loader{
+  position: fixed;
+  top: 0;
+  left: 0;
+  background: lightgrey;
+  height: 100%;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.disppear{
+  animation: vanish 1s forwards;
+}
+@keyframes vanish {
+  100%{
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+

@@ -2,7 +2,7 @@ from src.auth.auth import auth, init_login_app, current_user
 from src.oauth2.oauth2 import oauth2
 from src.photos.photo_handler import photos
 from src.app.config import *
-from src.app.Forms import UpdateForm
+from src.app.Forms import UpdateForm, UpdateCreationDateForm, UpdateLocationForm
 from flask import *
 from google.oauth2.credentials import Credentials
 import requests
@@ -55,24 +55,37 @@ def user_photos():
     if current_user.is_authenticated:
         if 'credentials' not in session:
             return redirect(url_for('oauth2.google_authorize'))
+
         form = UpdateForm(request.form)
+        location_form = UpdateLocationForm(request.form)
+        creation_date_form = UpdateCreationDateForm(request.form)
         current_user_family = Users.query.filter_by(parent_id=current_user.parent_id).all()
-        photo_url = []
+        photo_data = []
         family_users = []
         for family_user in current_user_family:
             family_user_photos = Photos.query.filter_by(user_id=family_user.id).all()
-            correct_family_user_photos = []
-            for photo in family_user_photos:
-                photos_meta_data = PhotosMetaData.query.filter_by(photo_id=photo.id).first()
+            photo_urls = db_handler.get_photos_from_db(family_user_photos, session['credentials'])
+            photos_data = {}
+            for photo_id, data in photo_urls.items():
+                photos_meta_data = PhotosMetaData.query.filter_by(photo_id=photo_id).first()
                 if not photos_meta_data:
-                    correct_family_user_photos.append(photo)
-            photo_urls = db_handler.get_photos_from_db(correct_family_user_photos, session['credentials'])
-            dict_photo_data = {family_user.email: photo_urls}
+                    photos_data[photo_id] = {'baseUrl': data['baseUrl'],
+                                             'title': 'Empty title',
+                                             'description': data['description'],
+                                             'location': 'Empty location',
+                                             'creation_data': data['creationTime']}
+                else:
+                    photos_data[photo_id] = {'baseUrl': data['baseUrl'],
+                                             'title': photos_meta_data.title,
+                                             'description': photos_meta_data.description,
+                                             'location': photos_meta_data.location,
+                                             'creation_data': photos_meta_data.creation_data}
+            photo_data.append({family_user.email: photos_data})
             family_users.append(family_user.email)
-            photo_url.append(dict_photo_data)
-        return render_template('photo_templates/user_photo.html', photos=photo_url,
+        return render_template('photo_templates/user_photo.html', photos=photo_data,
                                parent_id=current_user.parent_id, family_users=family_users,
-                               permissions=EditingPermission, form=form)
+                               permissions=EditingPermission,
+                               form=form, location_form=location_form, creation_date_form=creation_date_form)
     else:
         return redirect(url_for('auth.login'))
 
@@ -80,7 +93,7 @@ def user_photos():
 @app.route('/session_clear')
 def session_clear():
     session.clear()
-    return redirect(url_for('index'))
+    return redirect(url_for('user_photos'))
 
 
 @app.route('/googleb3f997e5d55f0443.html')
@@ -123,4 +136,4 @@ def revoke():
 
 
 if __name__ == '__main__':
-    app.run(port=8080)
+    app.run(port=8080, debug=True)

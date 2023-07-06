@@ -1,0 +1,31 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+{% with messages = get_flashed_messages() %}
+    {% if messages %}
+        {% for msg in messages %}
+            <p>{{ msg }}</p>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+<div class="container d-flex align-items-center justify-content-center vh-100">
+    <div class="col-md-6">
+        <form method="POST" action="{{ url_for('oauth2.icloud_authorize') }}">
+            {% if form.csrf_token %}
+                {{ form.csrf_token }}
+            {% endif %}
+              <div class="form-group">
+                <label for="exampleInputEmail1">Apple ID</label>
+                  {{ form.apple_id }}
+                <small id="emailHelp" class="form-text text-muted">We'll never share your Apple ID with anyone else.</small>
+              </div>
+            <hr class="my-100">
+            <div class="form-group">
+                <label for="password">Password:</label>
+                {{ form.password }}<br>
+                {{ form.submit }}
+            </div>
+        </form><br>
+    </div>
+</div>
+{% endblock %}

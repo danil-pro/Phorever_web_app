@@ -1,0 +1,28 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+{% with messages = get_flashed_messages() %}
+    {% if messages %}
+        {% for msg in messages %}
+            <p>{{ msg }}</p>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+<div class="container d-flex align-items-center justify-content-center vh-100">
+    <div class="col-md-6">
+      <form method="POST" action="{{ url_for('oauth2.icloud_verify_2fa') }}">
+        {{ form.csrf_token }}
+        {{ form.code.label }} {{ form.code }}
+        {% if form.code.errors %}
+          <ul class="errors">
+            {% for error in form.code.errors %}
+              <li>{{ error }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+        <br>
+        {{ form.submit }}
+      </form>
+    </div>
+</div>
+{% endblock %}

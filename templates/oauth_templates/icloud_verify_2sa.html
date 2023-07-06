@@ -1,0 +1,30 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+{% with messages = get_flashed_messages() %}
+    {% if messages %}
+        {% for msg in messages %}
+            <p>{{ msg }}</p>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+<div class="container d-flex align-items-center justify-content-center vh-100">
+    <div class="col-md-6">
+      <h1>Two-Step Authentication Verification</h1>
+      <form method="POST" action="{{ url_for('oauth2.icloud_verify_2sa') }}">
+            {{ form.csrf_token }}
+            <div>
+                {{ form.device.label }}
+                {{ form.device }}
+            </div>
+            <div>
+                {{ form.code.label }}
+                {{ form.code }}
+            </div>
+            <div>
+                {{ form.submit }}
+            </div>
+      </form>
+    </div>
+</div>
+{% endblock %}

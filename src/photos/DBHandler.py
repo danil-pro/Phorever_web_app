@@ -1,15 +1,16 @@
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from google.auth.exceptions import RefreshError
-
+from flask import redirect, url_for
 from PIL import Image
-import face_recognition
+# import face_recognition
 import numpy as np
 from itertools import combinations
 import pickle
 
 import keyring
 from pyicloud import PyiCloudService
+from pyicloud.exceptions import PyiCloudFailedLoginException
 
 import requests
 
@@ -85,33 +86,36 @@ class DBHandler:
                                           'description': 'Empty description',
                                           'creationTime': '0000-00-00'}
         if icloud_photos_ids:
-            photo_data_dict = {}  # Dictionary to store photo data
+            try:
+                photo_data_dict = {}  # Dictionary to store photo data
 
-            for icloud_photo_id in icloud_photos_ids:
-                photo_id = Photos.query.filter_by(photos_data=icloud_photo_id).first()
-                icloud_password = keyring.get_password("pyicloud", photo_id.apple_id)
+                for icloud_photo_id in icloud_photos_ids:
+                    photo_id = Photos.query.filter_by(photos_data=icloud_photo_id).first()
+                    icloud_password = keyring.get_password("pyicloud", photo_id.apple_id)
 
-                if photo_id.apple_id not in photo_data_dict:
-                    api = PyiCloudService(photo_id.apple_id,
-                                          icloud_password)  # Register PyiCloudService only once per apple_id
-                    photo_data_dict[photo_id.apple_id] = {}  # Initialize a new inner dictionary for each apple_id
+                    if photo_id.apple_id not in photo_data_dict:
+                        api = PyiCloudService(photo_id.apple_id,
+                                              icloud_password)  # Register PyiCloudService only once per apple_id
+                        photo_data_dict[photo_id.apple_id] = {}  # Initialize a new inner dictionary for each apple_id
 
-                    for photo in api.photos.albums['All Photos']:
-                        for version, data in photo.versions.items():
-                            if data['type'] == 'public.jpeg':
-                                photo_data_dict[photo_id.apple_id][photo.id] = {'baseUrl': data['url'],
-                                                                                'creationTime': photo.created}
+                        for photo in api.photos.albums['All Photos']:
+                            for version, data in photo.versions.items():
+                                if data['type'] == 'public.jpeg':
+                                    photo_data_dict[photo_id.apple_id][photo.id] = {'baseUrl': data['url'],
+                                                                                    'creationTime': photo.created}
 
-            for icloud_photo_id in icloud_photos_ids:
-                photo_id = Photos.query.filter_by(photos_data=icloud_photo_id).first()
+                for icloud_photo_id in icloud_photos_ids:
+                    photo_id = Photos.query.filter_by(photos_data=icloud_photo_id).first()
 
-                if photo_id.apple_id in photo_data_dict:
-                    apple_id_data = photo_data_dict[photo_id.apple_id]
-                    for key, val in apple_id_data.items():
-                        if icloud_photo_id == key:
-                            photo_url[photo_id.id] = {'baseUrl': val['baseUrl'],
-                                                      'description': 'Empty description',
-                                                      'creationTime': str(val['creationTime']).split()[0]}
+                    if photo_id.apple_id in photo_data_dict:
+                        apple_id_data = photo_data_dict[photo_id.apple_id]
+                        for key, val in apple_id_data.items():
+                            if icloud_photo_id == key:
+                                photo_url[photo_id.id] = {'baseUrl': val['baseUrl'],
+                                                          'description': 'Empty description',
+                                                          'creationTime': str(val['creationTime']).split()[0]}
+            except PyiCloudFailedLoginException:
+                return redirect(url_for('oauth2.icloud_authorize'))
 
         return photo_url
 
@@ -190,70 +194,70 @@ class DBHandler:
 
         return file_name
 
-    def face_encode_handler(self, photo_list):
-        try:
-            face_encode = {}
-            for photo_id, file_name in photo_list.items():
-                image_path = os.path.join(os.path.dirname(__file__), '..', '..',
-                                          'static', 'img', 'user_photos', file_name)
-                image = face_recognition.load_image_file(image_path)
-                face_locations = face_recognition.face_locations(image, model='cnn')
-                print(f'There are {len(face_locations)} people in this image')
-                photo_face_encoding = face_recognition.face_encodings(image, face_locations, model='large')
-
-                face_encodes = []
-                for one_face_encode in photo_face_encoding:
-                    face_encode_xyz = np.array(one_face_encode)
-                    face_encodes.append(pickle.dumps(face_encode_xyz))
-
-                face_encode[photo_id] = face_encodes
-
-                os.remove(image_path)
-
-            return face_encode
-        except Exception as e:
-            print(e)
-
-    def face_recognition_handler(self, face_encodes):
-        try:
-            matches = []
-            checked_ids = set()  # Множество для хранения уже проверенных идентификаторов
-
-            for i, entry1 in enumerate(face_encodes):
-                encode1 = list(entry1.values())[0]
-                photo_id1 = list(entry1.keys())[0]
-
-                # Проверяем, что первый идентификатор еще не был проверен
-                if photo_id1 in checked_ids:
-                    continue
-
-                photo_ids = {photo_id1}  # Создаем множество с идентификатором первого лица
-
-                for j, entry2 in enumerate(face_encodes[i + 1:], start=i + 1):
-                    encode2 = list(entry2.values())[0]
-                    photo_id2 = list(entry2.keys())[0]
-
-                    if photo_id2 in checked_ids:
-                        continue
-
-                    is_match = face_recognition.compare_faces([encode1], encode2)
-
-                    if any(is_match):
-                        photo_ids.add(photo_id2)
-                        checked_ids.add(photo_id2)
-
-                if len(photo_ids) >= 1:
-                    # Если в множестве больше одного идентификатора, добавляем его в список совпадений
-                    matches.append({True: photo_ids})
-
-                checked_ids.update(photo_ids)  # Добавляем все идентификаторы в множество уже проверенных
-
-            # Удаление списков, которые содержатся в других списках
-            matches = [match for i, match in enumerate(matches) if
-                       not any(match[True] < m[True] for m in matches[i + 1:])]
-
-            return matches
-
-        except Exception as e:
-            print(e)
-            return ''
+    # def face_encode_handler(self, photo_list):
+    #     try:
+    #         face_encode = {}
+    #         for photo_id, file_name in photo_list.items():
+    #             image_path = os.path.join(os.path.dirname(__file__), '..', '..',
+    #                                       'static', 'img', 'user_photos', file_name)
+    #             image = face_recognition.load_image_file(image_path)
+    #             face_locations = face_recognition.face_locations(image, model='cnn')
+    #             print(f'There are {len(face_locations)} people in this image')
+    #             photo_face_encoding = face_recognition.face_encodings(image, face_locations, model='large')
+    #
+    #             face_encodes = []
+    #             for one_face_encode in photo_face_encoding:
+    #                 face_encode_xyz = np.array(one_face_encode)
+    #                 face_encodes.append(pickle.dumps(face_encode_xyz))
+    #
+    #             face_encode[photo_id] = face_encodes
+    #
+    #             os.remove(image_path)
+    #
+    #         return face_encode
+    #     except Exception as e:
+    #         print(e)
+    #
+    # def face_recognition_handler(self, face_encodes):
+    #     try:
+    #         matches = []
+    #         checked_ids = set()  # Множество для хранения уже проверенных идентификаторов
+    #
+    #         for i, entry1 in enumerate(face_encodes):
+    #             encode1 = list(entry1.values())[0]
+    #             photo_id1 = list(entry1.keys())[0]
+    #
+    #             # Проверяем, что первый идентификатор еще не был проверен
+    #             if photo_id1 in checked_ids:
+    #                 continue
+    #
+    #             photo_ids = {photo_id1}  # Создаем множество с идентификатором первого лица
+    #
+    #             for j, entry2 in enumerate(face_encodes[i + 1:], start=i + 1):
+    #                 encode2 = list(entry2.values())[0]
+    #                 photo_id2 = list(entry2.keys())[0]
+    #
+    #                 if photo_id2 in checked_ids:
+    #                     continue
+    #
+    #                 is_match = face_recognition.compare_faces([encode1], encode2)
+    #
+    #                 if any(is_match):
+    #                     photo_ids.add(photo_id2)
+    #                     checked_ids.add(photo_id2)
+    #
+    #             if len(photo_ids) >= 1:
+    #                 # Если в множестве больше одного идентификатора, добавляем его в список совпадений
+    #                 matches.append({True: photo_ids})
+    #
+    #             checked_ids.update(photo_ids)  # Добавляем все идентификаторы в множество уже проверенных
+    #
+    #         # Удаление списков, которые содержатся в других списках
+    #         matches = [match for i, match in enumerate(matches) if
+    #                    not any(match[True] < m[True] for m in matches[i + 1:])]
+    #
+    #         return matches
+    #
+    #     except Exception as e:
+    #         print(e)
+    #         return ''

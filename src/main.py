@@ -14,8 +14,8 @@ db_handler = DBHandler()
 
 
 def create_app():
-    app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), '..', '..', 'templates'),
-                static_folder=os.path.join(os.path.dirname(__file__), '..', '..', 'static'))
+    app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), '', '..', 'templates'),
+                static_folder=os.path.join(os.path.dirname(__file__), '', '..', 'static'))
 
     app.register_blueprint(photos, url_prefix='/photos')
 
@@ -136,4 +136,4 @@ def revoke():
 
 
 if __name__ == '__main__':
-    app.run(port=8080, debug=True)
+    app.run(host='0.0.0.0', port=8080, debug=True)

@@ -113,19 +113,15 @@ def icloud_authorize():
             try:
                 icloud_user = keyring.get_password("pyicloud", form.apple_id.data)
                 session['icloud_credentials'] = {'apple_id': form.apple_id.data}
-                if not icloud_user:
-                    api = PyiCloudService(form.apple_id.data, form.password.data)
-                    session['icloud_credentials'] = {'apple_id': form.apple_id.data}
-                    keyring.set_password("pyicloud", form.apple_id.data, form.password.data)
+                api = PyiCloudService(form.apple_id.data, form.password.data)
+                session['icloud_credentials'] = {'apple_id': form.apple_id.data}
+                keyring.set_password("pyicloud", form.apple_id.data, form.password.data)
 
-                    if api.requires_2fa:
-                        return redirect(url_for('oauth2.icloud_verify_2fa'))
-                    elif api.requires_2sa:
-                        return redirect(url_for('oauth2.icloud_verify_2sa', apple_id=form.apple_id.data))
-                    else:
-                        return redirect(url_for('photos.icloud_photos'))
+                if api.requires_2fa:
+                    return redirect(url_for('oauth2.icloud_verify_2fa'))
+                elif api.requires_2sa:
+                    return redirect(url_for('oauth2.icloud_verify_2sa', apple_id=form.apple_id.data))
                 else:
-                    session['icloud_credentials'] = {'apple_id': form.apple_id.data}
                     return redirect(url_for('photos.icloud_photos'))
 
             except PyiCloudFailedLoginException:

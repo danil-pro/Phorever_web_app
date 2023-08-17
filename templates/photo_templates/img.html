@@ -20,7 +20,7 @@
                     <input type="hidden" name="source_function" value="{{ source_function }}">
                     {% for photo in base_url %}
                         <label style="display: inline-block;">
-                            <img src="{{ photo['baseUrl'] }}" alt="" width="100%" height="150px"><br>
+                            <img src="{{ photo['baseUrl'] }}" alt="" height="150px"><br>
                             <input type="checkbox" name="selected_photos" value="{{ photo['photoId'] }}"> Add photo
                         </label>
                     {% endfor %}
@@ -49,7 +49,7 @@
                 <input type="hidden" name="source_function" value="{{ source_function }}">
                 {% for photo in base_url %}
                     <label style="display: inline-block;">
-                        <img src="{{ photo }}" alt="" width="100%" height="150px"><br>
+                        <img src="{{ photo }}" alt="" height="150px"><br>
                         <input type="checkbox" name="selected_photos" value="{{ photo }}"> Add photo
                     </label>
                 {% endfor %}
@@ -72,7 +72,7 @@
                 {% for photo in base_url %}
                     {% for photo_id, url in photo.items() %}
                         <label style="display: inline-block;">
-                            <img src="{{ url }}" alt="" width="100%" height="150px"><br>
+                            <img src="{{ url }}" alt="" height="150px"><br>
                             <input type="checkbox" name="selected_photos" value="{{ photo_id }}"> Add photo
                         </label>
                     {% endfor %}

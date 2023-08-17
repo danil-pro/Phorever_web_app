@@ -59,12 +59,14 @@ def user_photos():
         form = UpdateForm(request.form)
         location_form = UpdateLocationForm(request.form)
         creation_date_form = UpdateCreationDateForm(request.form)
+        family_photos = Photos.query.filter(Users.parent_id == current_user.parent_id, Photos.user_id == Users.id).all()
+        photo_urls = db_handler.get_photos_from_db(family_photos, session['credentials'])
         current_user_family = Users.query.filter_by(parent_id=current_user.parent_id).all()
-        photo_data = []
+        photo_data = {}
         family_users = []
+
         for family_user in current_user_family:
-            family_user_photos = Photos.query.filter_by(user_id=family_user.id).all()
-            photo_urls = db_handler.get_photos_from_db(family_user_photos, session['credentials'])
+            # print(family_user.email)
             photos_data = {}
             for photo_id, data in photo_urls.items():
                 photos_meta_data = PhotosMetaData.query.filter_by(photo_id=photo_id).first()
@@ -80,7 +82,13 @@ def user_photos():
                                              'description': photos_meta_data.description,
                                              'location': photos_meta_data.location,
                                              'creation_data': photos_meta_data.creation_data}
-            photo_data.append({family_user.email: photos_data})
+            for i, k in photos_data.items():
+                user_photo = Photos.query.filter_by(id=i).first()
+                if family_user.id == user_photo.user_id:
+                    if family_user.email not in photo_data:
+                        photo_data[family_user.email] = {i: k}
+                    else:
+                        photo_data[family_user.email][i] = k
             family_users.append(family_user.email)
         return render_template('photo_templates/user_photo.html', photos=photo_data,
                                parent_id=current_user.parent_id, family_users=family_users,

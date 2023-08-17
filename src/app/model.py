@@ -50,6 +50,7 @@ class FaceEncode(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     face_encode = db.Column(db.LargeBinary, nullable=True)
     photo_id = db.Column(db.Integer, db.ForeignKey('photos.id'), nullable=False)
+    face_code = db.Column(db.String(6), nullable=False)
     photo = db.relationship('Photos', backref='face_encode')
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
 

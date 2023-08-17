@@ -180,3 +180,5 @@ cython_debug/
 
 Pipfile
 Pipfile.lock
+GOOGLE_CREDENTIALS.json
+static/img/user_photos/faces

@@ -1,4 +1,5 @@
 import json
+import os.path
 import pickle
 
 import flask
@@ -14,24 +15,26 @@ from dropbox import files, sharing
 # from src.app.config import *
 from src.app.model import db, Photos, Users, PhotosMetaData, EditingPermission, FaceEncode
 from src.photos.DBHandler import DBHandler
+from src.photos.Face_Encode_handler import FaceEncodeHandler
 from src.oauth2.oauth2 import authenticator
 from src.app.Forms import UpdateForm, UpdateLocationForm, UpdateCreationDateForm
 
 import asyncio
+import shutil
 
-import src.photos.Get_photos_from_API
-import numpy as np
-import json
+
+import src.photos.Handler as Handler
+# import numpy as np
+# import json
 from pyicloud import PyiCloudService
 import keyring
 from pyicloud.exceptions import PyiCloudNoStoredPasswordAvailableException
-
 
 photos = Blueprint('photos', __name__, template_folder='../templates/photo_templates', static_folder='../static')
 
 db_handler = DBHandler()
 
-Get_photos_from_API = src.photos.Get_photos_from_API
+# handler = src.photos.Handler
 
 
 @photos.route('/google_photos', methods=['GET', 'POST'])
@@ -45,11 +48,11 @@ def google_photos():
             if request.method == "POST":
                 if 'next_page' in request.form:
                     next_page_token = request.form.get('next_page_token')
-                    photos_data, next_page_token = Get_photos_from_API.photo_from_google(credentials, next_page_token)
+                    photos_data, next_page_token = Handler.photo_from_google(credentials, next_page_token)
                 else:
-                    photos_data, next_page_token = Get_photos_from_API.photo_from_google(credentials, None)
+                    photos_data, next_page_token = Handler.photo_from_google(credentials, None)
             else:
-                photos_data, next_page_token = Get_photos_from_API.photo_from_google(credentials, None)
+                photos_data, next_page_token = Handler.photo_from_google(credentials, None)
 
             user_photo_ids = [photo.photos_data for photo in Photos.query.filter().all()
                               if photo.service == '/photos/google_photos']
@@ -75,8 +78,14 @@ def add_photo():
         if request.method == 'POST':
             photos_data = request.form.getlist('selected_photos')
             source_function = request.form.get('source_function')
-            # download_photos = db_handler.download_photos(session['credentials'], photos_data)
-            # face_encode_handler = db_handler.face_encode_handler(download_photos)
+            face_encode_handler = FaceEncodeHandler()
+            result = []
+            if source_function == '/photos/google_photos':
+                result = face_encode_handler.download_photos(session['credentials'], photos_data, source_function)
+            elif source_function == '/photos/icloud_photos':
+                result = face_encode_handler.download_photos(session['icloud_credentials'], photos_data,
+                                                             source_function)
+                print(result)
             for photo_data in photos_data:
                 if source_function == '/photos/google_photos':
                     photo = Photos(photos_data=photo_data, service=source_function,
@@ -93,13 +102,16 @@ def add_photo():
                                    user_id=current_user.id)
                     db.session.add(photo)
             db.session.commit()
-            # for photo_id, face_encode in face_encode_handler.items():
-            #     photo = Photos.query.filter_by(photos_data=photo_id).first()
-            #     for faces in face_encode:
-            #         face = FaceEncode(face_encode=faces,
-            #                           photo_id=photo.id, user_id=current_user.id)
-            #         db.session.add(face)
-            #     db.session.commit()
+            for photo_id, face_encode in result.items():
+                photo = Photos.query.filter_by(photos_data=photo_id).first()
+                for faces in face_encode:
+                    code = Handler.generate_unique_code()
+                    face = FaceEncode(face_encode=faces,
+                                      photo_id=photo.id,
+                                      face_code=code,
+                                      user_id=current_user.id)
+                    db.session.add(face)
+                db.session.commit()
 
             return redirect(url_for('user_photos'))
     return redirect(url_for('auth.login'))
@@ -165,7 +177,8 @@ def icloud_photos():
         try:
             icloud_password = keyring.get_password("pyicloud", session['icloud_credentials']['apple_id'])
             api = PyiCloudService(session['icloud_credentials']['apple_id'], icloud_password)
-            photo_ids = set()  # Множество для хранения уникальных идентификаторов фотографий
+            api.authenticate(force_refresh=True)
+            photo_ids = set()
             data_url = []
 
             for photo in api.photos.albums['All Photos']:
@@ -300,23 +313,58 @@ def people():
     if current_user.is_authenticated:
         if 'credentials' not in session:
             return redirect(url_for('oauth2.google_authorize'))
+        faces_directory = os.path.join(os.path.dirname(__file__), '..', '..', 'static',
+                                       'img', 'user_photos', 'faces')
         current_user_family = Users.query.filter_by(parent_id=current_user.parent_id).all()
         face_encode = []
         for family_user in current_user_family:
             people_face = FaceEncode.query.filter_by(user_id=family_user.id).all()
             for face in people_face:
                 decoded_face = pickle.loads(face.face_encode)
-                face_encode.append({face.photo_id: decoded_face})
-        family_face_recognition = db_handler.face_recognition_handler(face_encode)
-        faces = []
-        for i in family_face_recognition:
-            for _, photo_ids in i.items():
-                family_user_photos = []
-                for photo_id in photo_ids:
-                    family_user_photos.append(Photos.query.filter_by(id=photo_id).first())
-                faces.append(db_handler.get_photos_from_db(family_user_photos, session['credentials']))
+                face_encode.append({face.photo_id: [decoded_face, face.face_code]})
+        list_face_code = Handler.face_folders(face_encode, session, current_user.parent_id)
+        items_to_remove = []
+        for i in list_face_code:
+            for photo_id, path in i.items():
+                existing_files = [file for root, dirs, files in os.walk(faces_directory) for file in files]
+                if f'{path[1]}.jpeg' not in existing_files:
+                    folder_path = os.path.join(faces_directory, path[0].split('/')[0])
+                    face = FaceEncode.query.filter_by(face_code=path[1]).delete()
+                    db.session.commit()
+                    items_to_remove.append(i)
+                    if os.path.exists(folder_path):
+                        shutil.rmtree(folder_path)
 
-        return render_template('photo_templates/people.html', faces=faces)
+        for item in items_to_remove:
+            list_face_code.remove(item)
+
+        return render_template('photo_templates/people.html', face_dir=list_face_code)
     else:
         return redirect(url_for('auth.login'))
 
+
+@photos.route('/people/<face_code>', methods=['GET', 'POST'])
+def one_face_people(face_code):
+    if current_user.is_authenticated:
+        if 'credentials' not in session:
+            return redirect(url_for('oauth2.google_authorize'))
+        current_user_family = Users.query.filter_by(parent_id=current_user.parent_id).all()
+        face_encode = []
+        for family_user in current_user_family:
+            people_face = FaceEncode.query.filter_by(user_id=family_user.id).all()
+            for face in people_face:
+                decoded_face = pickle.loads(face.face_encode)
+                face_encode.append({face.photo_id: [decoded_face, face.face_code]})
+        face_encode_handler = FaceEncodeHandler()
+        family_face_recognition = face_encode_handler.face_recognition_handler(face_encode)
+        faces = []
+        for i in family_face_recognition:
+            family_user_photos = []
+            for photo_id, photo_ids in i.items():
+                if photo_ids[0] == face_code:
+                    for j in photo_ids[1]:
+                        family_user_photos.append(Photos.query.filter_by(id=j).first())
+            faces.append(db_handler.get_photos_from_db(family_user_photos, session['credentials']))
+        return render_template('photo_templates/one_face_people.html', faces=faces)
+    else:
+        return redirect(url_for('auth.login'))

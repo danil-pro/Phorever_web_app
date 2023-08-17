@@ -114,9 +114,10 @@ def icloud_authorize():
                 icloud_user = keyring.get_password("pyicloud", form.apple_id.data)
                 session['icloud_credentials'] = {'apple_id': form.apple_id.data}
                 api = PyiCloudService(form.apple_id.data, form.password.data)
+                api.authenticate(force_refresh=True)
                 session['icloud_credentials'] = {'apple_id': form.apple_id.data}
                 keyring.set_password("pyicloud", form.apple_id.data, form.password.data)
-
+                print(api.client_id)
                 if api.requires_2fa:
                     return redirect(url_for('oauth2.icloud_verify_2fa'))
                 elif api.requires_2sa:
@@ -125,12 +126,25 @@ def icloud_authorize():
                     return redirect(url_for('photos.icloud_photos'))
 
             except PyiCloudFailedLoginException:
-                flash('invalid login')
+                flash('invalid Apple id or password')
                 return redirect(url_for('oauth2.icloud_authorize'))
 
         return render_template('oauth_templates/icloud_login.html', form=form)
 
     return redirect(url_for('auth.login'))
+
+# @oauth2.route('/', methods=['GET', 'POST'])
+# def icloud_authorize():
+#     if current_user.is_authenticated:
+#         form = IcloudLoginForm()
+#         if request.method == 'POST' and form.validate():
+#             try:
+#
+#             except PyiCloudFailedLoginException:
+#                 flash('invalid login')
+#                 return redirect(url_for('oauth2.icloud_authorize'))
+#
+#     return redirect(url_for('auth.login'))
 
 
 @oauth2.route('/icloud_verify_2fa', methods=['GET', 'POST'])
@@ -141,6 +155,7 @@ def icloud_verify_2fa():
         verification_code = form.code.data
         icloud_password = keyring.get_password("pyicloud", session['icloud_credentials']['apple_id'])
         api = PyiCloudService(session['icloud_credentials']['apple_id'], icloud_password)
+        api.authenticate(force_refresh=True)
         result = api.validate_2fa_code(verification_code)
         if not result:
             flash('Invalid verification code')
@@ -164,6 +179,7 @@ def icloud_verify_2sa():
         security_code = form.code.data
         icloud_password = keyring.get_password("pyicloud", session['icloud_credentials']['apple_id'])
         api = PyiCloudService(session['icloud_credentials']['apple_id'], icloud_password)
+        api.authenticate(force_refresh=True)
         devices = api.trusted_devices
         device_list = []
         for i, device in enumerate(devices):

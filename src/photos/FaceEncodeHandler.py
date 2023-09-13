@@ -12,7 +12,7 @@ from itertools import combinations
 import pickle
 from collections import Counter
 import re
-# from pillow_heif import register_heif_opener
+from pillow_heif import register_heif_opener
 
 
 from src.app.model import db, FaceEncode, Users, Photos
@@ -24,7 +24,7 @@ import requests
 
 from src.app.config import *
 
-# register_heif_opener()
+register_heif_opener()
 
 
 class FaceEncodeHandler:
@@ -45,7 +45,8 @@ class FaceEncodeHandler:
                             credentials=Credentials.from_authorized_user_info(credentials),
                             static_discovery=False)
 
-            for photo_id in photo_ids:
+            for photo_data in photo_ids:
+                photo_id, photo_url = photo_data.split('|')
                 request = service.mediaItems().get(mediaItemId=photo_id).execute()
                 download_url = request['baseUrl'] + '=d'  # Add '=d' to download the full-size photo
                 response = requests.get(download_url)
@@ -69,7 +70,8 @@ class FaceEncodeHandler:
             api.authenticate(force_refresh=True)
 
             for photo in api.photos.albums['All Photos']:
-                for photo_id in photo_ids:
+                for photo_data in photo_ids:
+                    photo_id, photo_url = photo_data.split('|')
                     if photo.id == photo_id:
 
                         self.image_path = os.path.join(self.directory, photo.filename)
@@ -78,11 +80,12 @@ class FaceEncodeHandler:
                         download = photo.download()
                         with open(self.image_path, 'wb') as thumb_file:
                             thumb_file.write(download.raw.read())
+                            thumb_file.close()
 
-                        if '.HEIC' in photo.filename:
-                            image = Image.open(self.image_path)
-                            image.convert('RGB').save(
-                                os.path.join(self.directory, 'output', os.path.splitext(photo.filename)[0] + '.jpg'))
+                        # if '.HEIC' in photo.filename:
+                        #     image = Image.open(self.image_path)
+                        #     image.convert('RGB').save(
+                        #         os.path.join(self.directory, os.path.splitext(photo.filename)[0] + '.jpg'))
 
         return self.face_encode_handler(self.file_name)
 
@@ -105,7 +108,7 @@ class FaceEncodeHandler:
                                         static_discovery=False)
 
                         request = service.mediaItems().get(mediaItemId=photo_id).execute()
-                        download_url = request['baseUrl'] + '=d'  # Add '=d' to download the full-size photo
+                        download_url = request['baseUrl'] + '=d'
                         response = requests.get(download_url)
 
                         if response.status_code == 200:
@@ -119,18 +122,36 @@ class FaceEncodeHandler:
                         icloud_password = keyring.get_password("pyicloud", session['icloud_credentials']['apple_id'])
                         api = PyiCloudService(session['icloud_credentials']['apple_id'], icloud_password)
                         api.authenticate(force_refresh=True)
+                        print(photo_ids)
+                        icloud_photo_ids = []
+                        for icloud_photo_id in photo_ids:
+                            for icloud_id, _ in icloud_photo_id.items():
+                                icloud_photo_ids.append(icloud_id)
+                        for icloud_photo_id in icloud_photo_ids:
+                            photo_downloaded = False  # Флаг для обозначения, что фотография успешно загружена
+                            for photo in api.photos.albums['All Photos']:
+                                if photo.id == icloud_photo_id:
 
-                        for photo in api.photos.albums['All Photos']:
-                            for icloud_photo_id in photo_ids:
-                                for icloud_id, _ in icloud_photo_id.items():
-                                    if photo.id == icloud_id:
-
-                                        download = photo.download()
-                                        with open(self.image_path, 'wb') as thumb_file:
-                                            thumb_file.write(download.raw.read())
+                                    download = photo.download()
+                                    with open(self.image_path, 'wb') as thumb_file:
+                                        thumb_file.write(download.raw.read())
+                                        thumb_file.close()
+                                        photo_downloaded = True
+                                    break  # Завершаем внутренний цикл после загрузки фотографии
+                            if photo_downloaded:
+                                for item in photo_ids:
+                                    if icloud_photo_id in item:
+                                        photo_ids.remove(item)
+                                        break
+                                break
 
                     image = face_recognition.load_image_file(self.image_path)
                     face_locations = face_recognition.face_locations(image)
+                    if not face_locations:
+                        face = FaceEncode.query.filter_by(face_code=data[1]).delete()
+                        db.session.commit()
+                        os.remove(self.image_path)
+                        continue
 
                     count = 1
                     for face_location in face_locations:
@@ -175,7 +196,7 @@ class FaceEncodeHandler:
                     face_code_lower = face.face_code.lower()
                     face_dir = [face_code_lower[i:i + 2] for i in range(0, len(face_code_lower), 2)]
                     is_match = face_recognition.compare_faces(photo_face_encoding, pickle.loads(face.face_encode),
-                                                              tolerance=0.55)
+                                                              tolerance=0.3)
                     if all(is_match):
                         path = f'{face_dir[0]}'
                         count = 0
@@ -205,7 +226,7 @@ class FaceEncodeHandler:
                 os.remove(os.path.join(self.download_faces, filename))
 
         for filename in os.listdir(self.faces_directory):
-            if filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif')):
+            if filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.HEIC')):
                 os.remove(os.path.join(self.faces_directory, filename))
 
         return faces
@@ -243,10 +264,10 @@ class FaceEncodeHandler:
 
             for photo_id, file_name in photo_list.items():
                 image_path = os.path.join(self.directory, file_name)
-                if '.HEIC' in file_name:
-                    temp_img = Image.open(image_path)
-                    jpeg_photo = image_path.replace('.HEIC', '.jpeg')
-                    temp_img.save(jpeg_photo)
+                # if '.HEIC' in file_name:
+                #     temp_img = Image.open(image_path)
+                #     jpeg_photo = image_path.replace('.HEIC', '.jpeg')
+                #     temp_img.save(jpeg_photo)
                 image = face_recognition.load_image_file(image_path)
                 face_locations = face_recognition.face_locations(image)
                 if len(face_locations) == 0:
@@ -299,7 +320,7 @@ class FaceEncodeHandler:
                     if code2 in check_codes:
                         continue
 
-                    is_match = face_recognition.compare_faces([encode1], encode2, tolerance=0.576)
+                    is_match = face_recognition.compare_faces([encode1], encode2)
 
                     if all(is_match):
                         match_photo_ids[photo_id2] = encode2
@@ -316,7 +337,7 @@ class FaceEncodeHandler:
                             if code in check_codes:
                                 continue
 
-                            is_match = face_recognition.compare_faces([val], encode, tolerance=0.576)
+                            is_match = face_recognition.compare_faces([val], encode)
 
                             if all(is_match):
                                 temp_dict[photo_id] = encode
@@ -326,9 +347,12 @@ class FaceEncodeHandler:
                             #     del temp_dict[photo_id]
 
                 match_photo_ids.update(temp_dict)
-
-                matches.append({photo_id1: [encode1, code1, list(match_photo_ids.keys())]})
-
+                face = FaceEncode.query.filter_by(face_code=code1).first()
+                root_face = FaceEncode.query.filter_by(face_code=face.key_face).first()
+                if root_face:
+                    matches.append({root_face.photo_id: [encode1, face.key_face, list(match_photo_ids.keys())]})
+                else:
+                    matches.append({photo_id1: [encode1, code1, list(match_photo_ids.keys())]})
             # for i, entry1 in enumerate(pair_face_encodes):
             #     encode11 = list(entry1.values())[0][0]
             #     photo_id11 = list(entry1.keys())[0]
@@ -343,6 +367,11 @@ class FaceEncodeHandler:
             for data in matches:
                 for key, val in data.items():
                     data[key] = [val[1], val[2]]
+                    for i in val[2]:
+                        face = FaceEncode.query.filter_by(photo_id=i).first()
+                        if not face.key_face:
+                            face.key_face = val[1]
+                            db.session.commit()
 
             print(matches)
             return matches

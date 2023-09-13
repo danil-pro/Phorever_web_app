@@ -21,7 +21,7 @@
                     {% for photo in base_url %}
                         <label style="display: inline-block;">
                             <img src="{{ photo['baseUrl'] }}" alt="" height="150px"><br>
-                            <input type="checkbox" name="selected_photos" value="{{ photo['photoId'] }}"> Add photo
+                            <input type="checkbox" name="selected_photos" value="{{ photo['photoId'] }}|{{ photo['baseUrl'] }}"> Add photo
                         </label>
                     {% endfor %}
                     <input type="submit" width="100px" height="50px" class="btn btn-primary" style="position: fixed; bottom: 20px; right: 20px;" value="Add photos">
@@ -48,6 +48,7 @@
             <form action="{{ url_for('photos.add_photo') }}" method="post">
                 <input type="hidden" name="source_function" value="{{ source_function }}">
                 {% for photo in base_url %}
+
                     <label style="display: inline-block;">
                         <img src="{{ photo }}" alt="" height="150px"><br>
                         <input type="checkbox" name="selected_photos" value="{{ photo }}"> Add photo
@@ -73,7 +74,7 @@
                     {% for photo_id, url in photo.items() %}
                         <label style="display: inline-block;">
                             <img src="{{ url }}" alt="" height="150px"><br>
-                            <input type="checkbox" name="selected_photos" value="{{ photo_id }}"> Add photo
+                            <input type="checkbox" name="selected_photos" value="{{ photo_id }}|{{ url }}"> Add photo
                         </label>
                     {% endfor %}
                 {% endfor %}

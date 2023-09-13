@@ -235,8 +235,11 @@
         {% endfor %}
         <hr>
     {% else %}
-        <h2>Please select a photo from the offered services</h2><br>
-        <a href="{{ url_for('photos.google_photos') }}"> Google Photo</a>
-        <a href="{{ url_for('photos.dropbox_photos') }}"> Dropbox</a><br>
+        <h3 class="text-center">Select more photos from services:</h3><br>
+        <div class="d-flex justify-content-center">
+            <a class="ml-3" href="{{ url_for('photos.google_photos') }}"> <h5>Google Photo </h5></a>
+            <a class="ml-3" href="{{ url_for('photos.dropbox_photos') }}"> <h5>Dropbox </h5></a>
+            <a class="ml-3" href="{{ url_for('photos.icloud_photos') }}"> <h5>Icloud </h5></a>
+        </div>
     {% endif %}
 {% endblock %}

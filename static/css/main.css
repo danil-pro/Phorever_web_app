@@ -80,3 +80,70 @@ h1 {
   }
 }
 
+.select {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 10vw;
+  overflow: hidden;
+  /*border-radius: 0.5em;*/
+  box-shadow: 0 0 0 2px grey;
+}
+.select::after {
+  content: "";
+  position: absolute;
+  top: 0.9em;
+  right: 1.5em;
+  z-index: 1;
+  height: 0.7em;
+  width: 0.7em;
+  transform: rotate(45deg);
+  box-shadow: 2px 2px 0 grey;
+  pointer-events: none;
+}
+
+.select input {
+  display: none;
+}
+
+.color {
+  display: flex;
+  align-items: center;
+  height: 0;
+  overflow: hidden;
+}
+.select:hover .color {
+  min-height: 3em;
+  height: auto;
+}
+.select input:checked+.color {
+  z-index: 1;
+  order: -1;
+  height: auto;
+  box-shadow: 0 0 0 2px grey;
+}
+.select input:not(:checked)+.color:hover {
+  background-color: #eee;
+  cursor: pointer;
+}
+
+.color img {
+  margin: 0.5em 1em;
+  height: 2em;
+  width: 3em;
+}
+
+.select .placehold {
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  order: -1;
+  min-height: 3em;
+  padding-left: 1em;
+  box-shadow: 0 0 0 2px grey;
+}
+.select input:checked~.placehold {
+  display: none;
+}
+
+

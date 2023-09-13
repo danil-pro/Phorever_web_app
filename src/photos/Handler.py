@@ -5,7 +5,7 @@ from src.app.config import *
 import random
 import string
 from src.app.model import Photos, FaceEncode
-from src.photos.Face_Encode_handler import FaceEncodeHandler
+from src.photos.FaceEncodeHandler import FaceEncodeHandler
 
 
 def photo_from_google(credentials, page_token=None):
@@ -61,6 +61,5 @@ def face_folders(face_encode, session, parent_id):
                 list_face_code.append({photo_id: [formatted_face_code.lower(), f'{photo_ids[0]}']})
 
     face_encode_handler.download_face_photos(session, family_user_faces, parent_id)
-    print(family_user_faces)
 
     return list_face_code

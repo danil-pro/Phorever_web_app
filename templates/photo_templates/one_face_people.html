@@ -8,12 +8,108 @@
             {% endfor %}
         {% endif %}
     {% endwith %}
+    <div class="input-group">
+        <form method="POST" action="{{ url_for('photos.one_face_people', face_code=face_code) }}">
+            {% if add_face_name.csrf_token %}
+                {{ add_face_name.csrf_token }}
+            {% endif %}
+            <div class="input-group input-group-sm mb-3">
+              {{ add_face_name.face_name(value=name) }}
+              <div class="input-group-prepend">
+                {{ add_face_name.submit }}<br>
+              </div>
+            </div>
+        </form>
+    </div>
+
+    <div class="content" data-toggle="modal" data-target="#modal-relationship" style="display: inline-block;">
+        <button class="btn">Relationship</button>
+    </div>
+    <div class="modal fade" id="modal-relationship" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalLabel">Select Person:</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body overflow-auto text-center">
+                        {% for face_data in list_face_code %}
+                            {% for photo_id, data in face_data.items() %}
+                                {% if data[1] != face_code%}
+                                    <label style="display: inline-block; position: relative;">
+                                        <a href="#" data-toggle="modal" data-target="#photoModal{{ data[1] }}">
+                                            <img src="../../static/img/user_photos/faces/{{ data[0] }}/{{ data[1] }}.jpeg" height="150px" width="150px" alt=""><br>
+                                            <span style="word-wrap: break-word; position: absolute; bottom: 0; left: 0; background-color: rgba(0, 0, 0, 0.5); padding: 5px; font-size: 12px; width: 100%;; color: white; ;">{{ data[2] }}</span>
+                                        </a>
+                                    </label>
+                                    <div class="modal fade" id="photoModal{{ data[1] }}" tabindex="-1" role="dialog" aria-labelledby="photoModalLabel" aria-hidden="true">
+                                        <div class="modal-dialog" role="document">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title" id="photoModalLabel">Selected Photo:</h5>
+                                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                        <span aria-hidden="true">&times;</span>
+                                                    </button>
+                                                </div>
+                                                    <div class="modal-body text-center">
+                                                        <form method="POST" action="{{ url_for('photos.one_face_people', face_code=face_code) }}">
+                                                            <label style="display: inline-block; position: relative;">
+                                                                <img src="../../static/img/user_photos/faces/{{ data[0] }}/{{ data[1] }}.jpeg" class="img-fluid" alt="" width="150px" height="150px">
+                                                                <span style="word-wrap: break-word; position: absolute; bottom: 0; left: 0; background-color: rgba(0, 0, 0, 0.5); padding: 5px; font-size: 12px; width: 100%;; color: white; ;">{{ data[2] }}</span>
+                                                            </label>
+                                                            {{ add_family_member_form.relationship() }}
+                                                            <label style="display: inline-block; position: relative;">
+                                                                <img src="../../static/img/user_photos/faces/{{ face_path }}/{{ face_code }}.jpeg" class="img-fluid" alt="" width="150px" height="150px">
+                                                                <span style="word-wrap: break-word; position: absolute; bottom: 0; left: 0; background-color: rgba(0, 0, 0, 0.5); padding: 5px; font-size: 12px; width: 100%;; color: white; ;">{{ name }}</span>
+                                                            </label>
+                                                            {{ add_family_member_form.submit() }}
+                                                        </form>
+                                                    </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        {% endfor %}
+{#                    </form>#}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+{#            <select name="selected_id" style="margin-right: 10px;">#}
+{#                {% for i in person %}#}
+{#                    <option value="{{ i.id }}">{{ i.name }}</option>#}
+{#                {% endfor %}#}
+{#            </select>#}
+{#            {{ add_family_member_form.relationship() }}#}
+{#            {{ add_family_member_form.submit() }}#}
+
+
+
+
+
     {% for face in faces %}
         <div>
             {% for photo_id, metadata in face.items() %}
                 <div class="photo-content text-center">
                     <div class="content">
                         <img src="{{ metadata.baseUrl }}" height="250px" alt="">
+                            <div class="photo_data bg-light">
+                               {% if metadata.title|length > 10 %}
+                                    <label>{{ metadata.title[:10] }}...</label><br>
+                                {% else %}
+                                    <label>{{ metadata.title }}</label><br>
+                                {% endif %}
+                                {% if metadata.description|length > 10 %}
+                                    <label>{{ metadata.description[:10] }}...</label><br>
+                                {% else %}
+                                    <label>{{ metadata.description }}</label><br>
+                                {% endif %}
+                            </div>
                     </div>
                 </div>
             {% endfor %}

@@ -1,5 +1,6 @@
 from flask_sqlalchemy import SQLAlchemy
 from flask_user import UserMixin
+from datetime import datetime
 
 db = SQLAlchemy()
 
@@ -35,10 +36,12 @@ class PhotosMetaData(db.Model):
 class Photos(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     photos_data = db.Column(db.String(200000), nullable=False)
+    photos_url = db.Column(db.String(200000), nullable=False)
     service = db.Column(db.String(32), nullable=False)
     token = db.Column(db.String(300), nullable=True)
     refresh_token = db.Column(db.String(300), nullable=True)
     apple_id = db.Column(db.String(300), nullable=True)
+    created_at = db.Column(db.DateTime, default='2023-07-13 15:30:45.123456', nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     users = db.relationship('Users', secondary='editing_permission', backref='photos')
 
@@ -51,6 +54,8 @@ class FaceEncode(db.Model):
     face_encode = db.Column(db.LargeBinary, nullable=True)
     photo_id = db.Column(db.Integer, db.ForeignKey('photos.id'), nullable=False)
     face_code = db.Column(db.String(6), nullable=False)
+    name = db.Column(db.String(50), nullable=True)
+    key_face = db.Column(db.String(6), nullable=True)
     photo = db.relationship('Photos', backref='face_encode')
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
 
@@ -60,4 +65,3 @@ class EditingPermission(db.Model):
     photo_id = db.Column(db.Integer, db.ForeignKey('photos.id'), nullable=False)
     email = db.Column(db.String(225), db.ForeignKey('users.email'), nullable=False)
     editable = db.Column(db.Boolean, default=False)
-

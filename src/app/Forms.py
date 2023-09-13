@@ -96,3 +96,32 @@ class ICloudVerifyForm(FlaskForm):
                                   'aria-describedby': 'emailHelp',
                                   'placeholder': 'Enter verification code'})
     submit = SubmitField('Submit', render_kw={'class': 'btn', 'style': ''})
+
+
+class AddFaceName(FlaskForm):
+    face_name = StringField('title', validators=[DataRequired(), Length(max=50,
+                                                                        message="Name too long max 50 characters")],
+                            render_kw={'class': 'form-control',
+                                       'id': 'exampleInputEmail1',
+                                       'aria-label': 'Small',
+                                       'aria-describedby': 'inputGroup-sizing-sm', 'placeholder': 'Enter name'})
+
+    submit = SubmitField('Submit', render_kw={'class': 'btn', 'style': ''})
+
+
+class AddFamilyMemberForm(FlaskForm):
+    name = StringField('Имя', validators=[DataRequired(), Length(min=1, max=50)],
+                       render_kw={'class': 'form-control',
+                                  'id': 'exampleInputEmail1',
+                                  'aria-label': 'Small',
+                                  'aria-describedby': 'inputGroup-sizing-sm',
+                                  'placeholder': 'Enter name'})
+    relationship = SelectField('Родственная связь', choices=[
+        ('Father', 'Father'),
+        ('Mother', 'Mother'),
+        ('Son', 'Son'),
+        ('Daughter', 'Daughter'),
+        ('Husband', 'Husband'),
+        ('Wife', 'Wife')
+    ], render_kw={'class': 'form-select'})
+    submit = SubmitField('Submit', render_kw={'class': 'btn', 'style': ''})

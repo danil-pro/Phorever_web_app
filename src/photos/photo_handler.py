@@ -1,4 +1,4 @@
-import json
+# import json
 import os.path
 import pickle
 
@@ -15,13 +15,13 @@ from dropbox import files, sharing
 # from src.app.config import *
 from src.app.model import db, Photos, Users, PhotosMetaData, EditingPermission, FaceEncode
 from src.photos.DBHandler import DBHandler
-from src.photos.Face_Encode_handler import FaceEncodeHandler
+from src.photos.FaceEncodeHandler import FaceEncodeHandler
 from src.oauth2.oauth2 import authenticator
-from src.app.Forms import UpdateForm, UpdateLocationForm, UpdateCreationDateForm
+from src.app.Forms import UpdateForm, UpdateLocationForm, UpdateCreationDateForm, AddFaceName, AddFamilyMemberForm
 
 import asyncio
 import shutil
-
+import datetime
 
 import src.photos.Handler as Handler
 # import numpy as np
@@ -77,41 +77,43 @@ def add_photo():
     if current_user.is_authenticated:
         if request.method == 'POST':
             photos_data = request.form.getlist('selected_photos')
-            source_function = request.form.get('source_function')
-            face_encode_handler = FaceEncodeHandler()
-            result = []
-            if source_function == '/photos/google_photos':
-                result = face_encode_handler.download_photos(session['credentials'], photos_data, source_function)
-            elif source_function == '/photos/icloud_photos':
-                result = face_encode_handler.download_photos(session['icloud_credentials'], photos_data,
-                                                             source_function)
-                print(result)
-            for photo_data in photos_data:
+            if photos_data:
+                source_function = request.form.get('source_function')
+                face_encode_handler = FaceEncodeHandler()
+                result = []
                 if source_function == '/photos/google_photos':
-                    photo = Photos(photos_data=photo_data, service=source_function,
-                                   token=session['credentials']['token'],
-                                   refresh_token=session['credentials']['refresh_token'],
-                                   apple_id=None,
-                                   user_id=current_user.id)
-                    db.session.add(photo)
+                    result = face_encode_handler.download_photos(session['credentials'], photos_data, source_function)
                 elif source_function == '/photos/icloud_photos':
-                    photo = Photos(photos_data=photo_data, service=source_function,
-                                   token=None,
-                                   refresh_token=None,
-                                   apple_id=session['icloud_credentials']['apple_id'],
-                                   user_id=current_user.id)
-                    db.session.add(photo)
-            db.session.commit()
-            for photo_id, face_encode in result.items():
-                photo = Photos.query.filter_by(photos_data=photo_id).first()
-                for faces in face_encode:
-                    code = Handler.generate_unique_code()
-                    face = FaceEncode(face_encode=faces,
-                                      photo_id=photo.id,
-                                      face_code=code,
-                                      user_id=current_user.id)
-                    db.session.add(face)
+                    result = face_encode_handler.download_photos(session['icloud_credentials'], photos_data,
+                                                                 source_function)
+                for photo_data in photos_data:
+                    photo_id, photo_url = photo_data.split('|')
+                    if source_function == '/photos/google_photos':
+                        photo = Photos(photos_data=photo_id, photos_url=photo_url, service=source_function,
+                                       token=session['credentials']['token'],
+                                       refresh_token=session['credentials']['refresh_token'],
+                                       apple_id=None,
+                                       user_id=current_user.id)
+                        db.session.add(photo)
+                    elif source_function == '/photos/icloud_photos':
+                        photo = Photos(photos_data=photo_id, photos_url=photo_url, service=source_function,
+                                       token=None,
+                                       refresh_token=None,
+                                       apple_id=session['icloud_credentials']['apple_id'],
+                                       user_id=current_user.id)
+                        db.session.add(photo)
                 db.session.commit()
+                for photo_id, face_encode in result.items():
+                    photo = Photos.query.filter_by(photos_data=photo_id).first()
+                    for faces in face_encode:
+                        code = Handler.generate_unique_code()
+                        face = FaceEncode(face_encode=faces,
+                                          photo_id=photo.id,
+                                          face_code=code,
+                                          key_face=None,
+                                          user_id=current_user.id)
+                        db.session.add(face)
+                    db.session.commit()
 
             return redirect(url_for('user_photos'))
     return redirect(url_for('auth.login'))
@@ -186,6 +188,16 @@ def icloud_photos():
                     if data['type'] == 'public.jpeg' and photo.id not in photo_ids:
                         data_url.append({photo.id: data['url']})
                         photo_ids.add(photo.id)
+
+            user_photo_ids = [photo.photos_data for photo in Photos.query.filter().all()
+                              if photo.service == '/photos/icloud_photos']
+            if not data_url:
+                flash('No photo', 'info')
+                return render_template('photo_templates/img.html', source_function=url_for('photos.icloud_photos'))
+            for user_photo_id in user_photo_ids:
+                for data in data_url:
+                    if user_photo_id == next(iter(data)):
+                        data_url.remove(data)
 
             return render_template('photo_templates/img.html', base_url=data_url,
                                    source_function=url_for('photos.icloud_photos'))
@@ -295,7 +307,6 @@ def add_editing_permission():
             return redirect(url_for('oauth2.google_authorize'))
 
         if request.method == "POST":
-
             photos_data = request.form.getlist('selected_users')
             photo_id = request.form['photo_id']
             for email in photos_data:
@@ -327,16 +338,21 @@ def people():
         for i in list_face_code:
             for photo_id, path in i.items():
                 existing_files = [file for root, dirs, files in os.walk(faces_directory) for file in files]
-                if f'{path[1]}.jpeg' not in existing_files:
+                people_name = FaceEncode.query.filter_by(face_code=path[1]).first()
+                if people_name.name:
+                    path.append(people_name.name)
+                else:
+                    path.append('')
+                if f'{people_name.key_face}.jpeg' not in existing_files:
                     folder_path = os.path.join(faces_directory, path[0].split('/')[0])
-                    face = FaceEncode.query.filter_by(face_code=path[1]).delete()
-                    db.session.commit()
                     items_to_remove.append(i)
                     if os.path.exists(folder_path):
                         shutil.rmtree(folder_path)
 
         for item in items_to_remove:
             list_face_code.remove(item)
+        # print(list_face_code)
+        session['list_face_code'] = list_face_code
 
         return render_template('photo_templates/people.html', face_dir=list_face_code)
     else:
@@ -348,8 +364,13 @@ def one_face_people(face_code):
     if current_user.is_authenticated:
         if 'credentials' not in session:
             return redirect(url_for('oauth2.google_authorize'))
+        add_face_name = AddFaceName(request.form)
+        add_family_member_form = AddFamilyMemberForm(request.form)
+
+        people_name = FaceEncode.query.filter_by(face_code=face_code).first()
         current_user_family = Users.query.filter_by(parent_id=current_user.parent_id).all()
         face_encode = []
+
         for family_user in current_user_family:
             people_face = FaceEncode.query.filter_by(user_id=family_user.id).all()
             for face in people_face:
@@ -365,6 +386,50 @@ def one_face_people(face_code):
                     for j in photo_ids[1]:
                         family_user_photos.append(Photos.query.filter_by(id=j).first())
             faces.append(db_handler.get_photos_from_db(family_user_photos, session['credentials']))
-        return render_template('photo_templates/one_face_people.html', faces=faces)
+        if request.method == 'POST' and add_face_name.validate_on_submit():
+            people_faces = FaceEncode.query.filter_by(key_face=face_code).all()
+            for people_face in people_faces:
+                people_face.name = add_face_name.face_name.data
+            db.session.commit()
+            return redirect(url_for('photos.people'))
+
+        for face in faces:
+            for photo_id, data in face.items():
+                photos_meta_data = PhotosMetaData.query.filter_by(photo_id=photo_id).first()
+                if not photos_meta_data:
+                    continue
+                    # photos_data[photo_id] = {'baseUrl': data['baseUrl'],
+                    #                          'title': 'Empty title',
+                    #                          'description': data['description'],
+                    #                          'location': 'Empty location',
+                    #                          'creation_data': data['creationTime']}
+                else:
+                    data['title'] = photos_meta_data.title
+                    data['description'] = photos_meta_data.description
+                    data['location'] = photos_meta_data.location
+                    data['creation_data'] = photos_meta_data.creation_data
+                    # photos_data[photo_id] = {'baseUrl': data['baseUrl'],
+                    #                          'title': photos_meta_data.title,
+                    #                          'description': photos_meta_data.description,
+                    #                          'location': photos_meta_data.location,
+                    #                          'creation_data': photos_meta_data.creation_data}
+
+        return render_template('photo_templates/one_face_people.html', faces=faces, add_face_name=add_face_name,
+                               face_code=face_code, name=people_name.name,
+                               add_family_member_form=add_family_member_form, list_face_code=session['list_face_code'],
+                               face_path='/'.join([face_code[i:i+2] for i in range(0, len(face_code), 2)]))
+    else:
+        return redirect(url_for('auth.login'))
+
+
+@photos.route('/family_tree', methods=['GET', 'POST'])
+def family_tree():
+    if current_user.is_authenticated:
+        if 'credentials' not in session:
+            return redirect(url_for('oauth2.google_authorize'))
+        form = AddFamilyMemberForm(request.form)
+        if request.method == "POST":
+            pass
+        return redirect(url_for('photos.people'))
     else:
         return redirect(url_for('auth.login'))

@@ -140,7 +140,7 @@ celerybeat.pid
 # Environments
 .env
 .venv
-.idea
+../Google_app/.idea
 env/
 venv/
 ENV/

@@ -147,3 +147,26 @@ h1 {
 }
 
 
+.link {
+    fill: none;
+    stroke: #555;
+    stroke-opacity: 0.4;
+    stroke-width: 2px;
+}
+
+.node {
+    cursor: pointer;
+    fill: #ccc;
+}
+
+.node text {
+    font-size: 12px;
+    stroke: #333;
+    stroke-width: 0.5px;
+}
+
+.node circle {
+    stroke: #fff;
+    stroke-width: 3px;
+}
+

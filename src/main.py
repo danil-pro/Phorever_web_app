@@ -1,6 +1,8 @@
 from src.auth.auth import auth, init_login_app, current_user
 from src.oauth2.oauth2 import oauth2
 from src.photos.photo_handler import photos
+from src.family_tree.family_tree import family_tree
+from src.face_recognition.people_face_recognition import people_face
 from src.app.config import *
 from src.app.Forms import UpdateForm, UpdateCreationDateForm, UpdateLocationForm
 from flask import *
@@ -22,6 +24,10 @@ def create_app():
     app.register_blueprint(auth, url_prefix='/auth')
 
     app.register_blueprint(oauth2, url_prefix='/oauth2')
+
+    app.register_blueprint(family_tree, url_prefix='/family_tree')
+
+    app.register_blueprint(people_face, url_prefix='/people')
 
     app.secret_key = SECRET_KEY
 
@@ -144,5 +150,4 @@ def revoke():
 
 
 if __name__ == '__main__':
-    app.run(
-        host="0.0.0.0", port=8080)
+    app.run()

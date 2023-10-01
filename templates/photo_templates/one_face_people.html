@@ -9,7 +9,7 @@
         {% endif %}
     {% endwith %}
     <div class="input-group">
-        <form method="POST" action="{{ url_for('photos.one_face_people', face_code=face_code) }}">
+        <form method="POST" action="{{ url_for('people.one_face_people', face_code=face_code) }}">
             {% if add_face_name.csrf_token %}
                 {{ add_face_name.csrf_token }}
             {% endif %}
@@ -54,16 +54,19 @@
                                                     </button>
                                                 </div>
                                                     <div class="modal-body text-center">
-                                                        <form method="POST" action="{{ url_for('photos.one_face_people', face_code=face_code) }}">
+                                                        <form method="POST" action="{{ url_for('family_tree.family_tree_relationships') }}">
                                                             <label style="display: inline-block; position: relative;">
-                                                                <img src="../../static/img/user_photos/faces/{{ data[0] }}/{{ data[1] }}.jpeg" class="img-fluid" alt="" width="150px" height="150px">
+                                                                <img src="../../static/img/user_photos/faces/{{ data[0] }}/{{ data[1] }}.jpeg" class="" alt="" width="150px" height="150px">
                                                                 <span style="word-wrap: break-word; position: absolute; bottom: 0; left: 0; background-color: rgba(0, 0, 0, 0.5); padding: 5px; font-size: 12px; width: 100%;; color: white; ;">{{ data[2] }}</span>
+                                                                <input type="hidden" value="{{ data[1] }}" name="relative_person">
                                                             </label>
-                                                            {{ add_family_member_form.relationship() }}
+                                                            {{ add_family_member_form.relationship(class='relationship') }}
                                                             <label style="display: inline-block; position: relative;">
-                                                                <img src="../../static/img/user_photos/faces/{{ face_path }}/{{ face_code }}.jpeg" class="img-fluid" alt="" width="150px" height="150px">
+                                                                <img src="../../static/img/user_photos/faces/{{ face_path }}/{{ face_code }}.jpeg" class="" alt="" width="150px" height="150px">
                                                                 <span style="word-wrap: break-word; position: absolute; bottom: 0; left: 0; background-color: rgba(0, 0, 0, 0.5); padding: 5px; font-size: 12px; width: 100%;; color: white; ;">{{ name }}</span>
+                                                                <input type="hidden" value="{{ face_code }}" name="person">
                                                             </label>
+                                                            <div class="additional-form"></div>
                                                             {{ add_family_member_form.submit() }}
                                                         </form>
                                                     </div>
@@ -115,4 +118,102 @@
             {% endfor %}
         </div>
     {% endfor %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script type="text/javascript">
+$(document).ready(function() {
+    $('.relationship').change(function() {
+        let relationship = $(this).val();
+
+            let additionalForm = $(this).closest('.modal-body').find('.additional-form');
+
+        if (relationship === 'Parent') {
+            // Добавить поля для Parent или Child.
+            additionalForm.html(`
+                <label>Parent:
+                    <select name="type1">
+                        <option value="Father">Father</option>
+                        <option value="Mother">Mother</option>
+                    </select>
+                </label>
+
+                <label>Child:
+                    <select name="type2">
+                        <option value="Son">Son</option>
+                        <option value="Daughter">Daughter</option>
+                    </select>
+                </label>`);
+        }else if (relationship === 'Child') {
+            additionalForm.html(`
+                <label>Child:
+                    <select name="type1">
+                        <option value="Son">Son</option>
+                        <option value="Daughter">Daughter</option>
+                    </select>
+                </label>
+                <label>Parent:
+                    <select name="type2">
+                        <option value="Father">Father</option>
+                        <option value="Mother">Mother</option>
+                    </select>
+                </label>`);
+        }else if (relationship === 'Spouse') {
+            additionalForm.html(`
+                <label>Spouse1:
+                    <select name="type1">
+                        <option value="Husband">Husband</option>
+                        <option value="Wife">Wife</option>
+                    </select>
+                </label>
+                <label>Spouse2:
+                    <select name="type2">
+                        <option value="Husband">Husband</option>
+                        <option value="Wife">Wife</option>
+                    </select>
+                </label>`);
+        }
+        else if (relationship === 'Sibling') {
+            // Добавить поля для Sibling.
+            additionalForm.html(`
+                <label>Sibling:
+                    <select name="type1">
+                        <option value="Brother">Brother</option>
+                        <option value="Sister">Sister</option>
+                    </select>
+                </label>
+                 <label>Sibling:
+                    <select name="type2">
+                        <option value="Brother">Brother</option>
+                        <option value="Sister">Sister</option>
+                    </select>
+                </label>
+                <label>Degree:
+                    <select id="sibling-degree" name="degree">
+                        <option value="Full">Full</option>
+                        <option value="Half">Half</option>
+                    </select>
+                </label>
+                <div id="line-div">
+                    <label>line:
+                        <select name="line">
+                            <option value="Maternal">Maternal</option>
+                            <option value="Paternal">Paternal</option>
+                        </select>
+                    </label>
+                </div>`);
+
+            $('#sibling-degree').change(function() {
+                if ($(this).val() === 'Half') {
+                    $('#line-div').show(); // Показать Линию, если Сводный
+                } else {
+                    $('#line-div').hide(); // Скрыть Линию, если Родной
+                }
+            }).trigger('change'); // Вызов события изменения, чтобы установить начальное состояние Линии
+
+        } else {
+            additionalForm.html(''); // Очистка дополнительных полей, если они есть.
+        }
+    });
+});
+</script>
+
 {% endblock %}

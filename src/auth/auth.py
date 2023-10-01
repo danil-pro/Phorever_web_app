@@ -100,7 +100,6 @@ def verify_email(email, token):
 @auth.route('/login', methods=['GET', 'POST'])
 def login():
     form = LoginForm()
-    print(current_user.is_authenticated)
     if request.method == 'POST' and form.validate_on_submit():
         email = form.email.data
         password = form.password.data

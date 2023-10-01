@@ -47,7 +47,7 @@ class DBHandler:
                                                                    '%Y-%m-%d %H:%M:%S.%f')]
             time_difference = datetime.now() - photo_created_at[0]
 
-            if time_difference >= timedelta(days=1) or new_photo:
+            if time_difference >= timedelta(hours=1) or new_photo:      #lifetime session
                 photo_tokens = [photo.token for photo in user_photos]
                 unique_photo_tokens = []
                 for token in photo_tokens:

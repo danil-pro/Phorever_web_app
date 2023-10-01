@@ -53,9 +53,9 @@ class FaceEncode(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     face_encode = db.Column(db.LargeBinary, nullable=True)
     photo_id = db.Column(db.Integer, db.ForeignKey('photos.id'), nullable=False)
-    face_code = db.Column(db.String(6), nullable=False)
-    name = db.Column(db.String(50), nullable=True)
+    face_code = db.Column(db.String(6), nullable=False, unique=True)
     key_face = db.Column(db.String(6), nullable=True)
+    not_a_key = db.Column(db.Boolean, default=False)
     photo = db.relationship('Photos', backref='face_encode')
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
 
@@ -65,3 +65,23 @@ class EditingPermission(db.Model):
     photo_id = db.Column(db.Integer, db.ForeignKey('photos.id'), nullable=False)
     email = db.Column(db.String(225), db.ForeignKey('users.email'), nullable=False)
     editable = db.Column(db.Boolean, default=False)
+
+
+class Person(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=True)
+    face_code = db.Column(db.String(6), db.ForeignKey('face_encode.face_code'), nullable=False)
+
+    face_encode = db.relationship('FaceEncode', backref='person', uselist=False)
+
+
+class Relationship(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    relative_id = db.Column(db.Integer, db.ForeignKey('person.id'), nullable=False)
+    relationship_type = db.Column(db.String(50), nullable=False)
+    person_id = db.Column(db.Integer, db.ForeignKey('person.id'), nullable=False)
+    person_type = db.Column(db.String(50), nullable=False)
+    degree = db.Column(db.String(50), nullable=True)
+    line = db.Column(db.String(50), nullable=True)
+
+

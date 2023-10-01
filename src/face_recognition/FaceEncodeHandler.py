@@ -14,7 +14,6 @@ from collections import Counter
 import re
 from pillow_heif import register_heif_opener
 
-
 from src.app.model import db, FaceEncode, Users, Photos
 import keyring
 from pyicloud import PyiCloudService
@@ -73,7 +72,6 @@ class FaceEncodeHandler:
                 for photo_data in photo_ids:
                     photo_id, photo_url = photo_data.split('|')
                     if photo.id == photo_id:
-
                         self.image_path = os.path.join(self.directory, photo.filename)
 
                         self.file_name[photo_id] = photo.filename
@@ -94,6 +92,7 @@ class FaceEncodeHandler:
         existing_files = [file for root, dirs, files in os.walk(self.faces_directory) for file in files]
         for face_data in photo_ids:
             for photo_id, data in face_data.items():
+                # is_key_face = FaceEncode.query.filter_by(key_face=data[1]).first()
                 photo = Photos.query.filter_by(photos_data=photo_id).first()
                 with open('GOOGLE_CREDENTIALS.json', 'r') as json_file:
                     google_credentials = json.load(json_file)
@@ -118,11 +117,11 @@ class FaceEncodeHandler:
                                 photo_file.close()
 
                             self.rotate_image(True)
+
                     if photo.service == '/photos/icloud_photos':
-                        icloud_password = keyring.get_password("pyicloud", session['icloud_credentials']['apple_id'])
-                        api = PyiCloudService(session['icloud_credentials']['apple_id'], icloud_password)
+                        icloud_password = keyring.get_password("pyicloud", photo.apple_id)
+                        api = PyiCloudService(photo.apple_id, icloud_password)
                         api.authenticate(force_refresh=True)
-                        print(photo_ids)
                         icloud_photo_ids = []
                         for icloud_photo_id in photo_ids:
                             for icloud_id, _ in icloud_photo_id.items():
@@ -131,7 +130,6 @@ class FaceEncodeHandler:
                             photo_downloaded = False  # Флаг для обозначения, что фотография успешно загружена
                             for photo in api.photos.albums['All Photos']:
                                 if photo.id == icloud_photo_id:
-
                                     download = photo.download()
                                     with open(self.image_path, 'wb') as thumb_file:
                                         thumb_file.write(download.raw.read())
@@ -146,80 +144,82 @@ class FaceEncodeHandler:
                                 break
 
                     image = face_recognition.load_image_file(self.image_path)
-                    face_locations = face_recognition.face_locations(image)
-                    if not face_locations:
-                        face = FaceEncode.query.filter_by(face_code=data[1]).delete()
-                        db.session.commit()
-                        os.remove(self.image_path)
-                        continue
+                    print(self.image_path)
+                    image_pil = Image.open(self.image_path)
+                    width, height = image_pil.size
+                    face_locations = None
+                    if width > 4000 or height > 5000:
+                        face_locations = face_recognition.face_locations(image)
+                    else:
+                        face_locations = face_recognition.face_locations(image, model='cnn')
 
-                    count = 1
-                    for face_location in face_locations:
-                        top, right, bottom, left = face_location
-
-                        # Вычисляем новые координаты обрезки
-                        width = right - left
-                        height = bottom - top
-                        new_width = int(width * 2)
-                        new_height = int(height * 2)
-                        delta_width = (new_width - width) // 2
-                        delta_height = (new_height - height) // 2
-
-                        # Применяем новые координаты обрезки
-                        new_top = max(0, top - delta_height)
-                        new_right = min(image.shape[1], right + delta_width)
-                        new_bottom = min(image.shape[0], bottom + delta_height)
-                        new_left = max(0, left - delta_width)
-
-                        face_image = image[new_top:new_bottom, new_left:new_right]
-                        pil_image = Image.fromarray(face_image)
-                        file = f'/{str(count)}_{data[1]}.jpeg'
-                        pil_image.save(self.faces_directory + file)
-                        face_file_name[data[0]] = file
-                        count += 1
-
-        self.face_directory(parent_id)
-
-    def face_directory(self, parent_id):
-        faces = {}
-        for filename in os.listdir(self.faces_directory):
-            if filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif')):
-
-                image_path = os.path.join(self.faces_directory, filename)
-
-                image = face_recognition.load_image_file(image_path)
-                face_locations = face_recognition.face_locations(image)
-                photo_face_encoding = face_recognition.face_encodings(image, face_locations, model='large')
-                face_encode_data = (FaceEncode.query.join(Photos, FaceEncode.photo_id == Photos.id)
-                                    .join(Users, Photos.user_id == Users.id).filter(Users.parent_id == parent_id).all())
-                for face in face_encode_data:
-                    face_code_lower = face.face_code.lower()
-                    face_dir = [face_code_lower[i:i + 2] for i in range(0, len(face_code_lower), 2)]
-                    is_match = face_recognition.compare_faces(photo_face_encoding, pickle.loads(face.face_encode),
-                                                              tolerance=0.3)
-                    if all(is_match):
-                        path = f'{face_dir[0]}'
-                        count = 0
-                        while count < 3:
-                            folder_path = os.path.join(self.faces_directory, path)
-                            if not os.path.exists(folder_path):
-                                os.makedirs(folder_path)
-                            count += 1
-                            if count < 3:
-                                path += f'/{face_dir[count]}'
-
-                        new_filename = f"{face.face_code}.jpeg"  # Имя файла с новым кодом и расширением
-                        new_image_path = os.path.join(self.faces_directory, face_dir[0], face_dir[1],
-                                                      face_dir[2], new_filename)
-
-                        # Переименовываем файл
-                        os.rename(image_path, new_image_path)
-                        break
-                    # if not found_match:
-                    #     FaceEncode.query.filter_by(face_code=face.face_code).delete()
+                    if len(face_locations) == 0:
+                        face_locations = face_recognition.face_locations(image, number_of_times_to_upsample=2)
+                    # if not face_locations:
+                    #     face = FaceEncode.query.filter_by(face_code=data[1]).delete()
                     #     db.session.commit()
-                    #     found_match = False
+                    #     # os.remove(self.image_path)
                     #     break
+
+                    photo_face_encoding = face_recognition.face_encodings(image, face_locations, model='small')
+                    for face_encode, face_location in zip(photo_face_encoding, face_locations):
+                        face_encode_data = (FaceEncode.query.join(Photos, FaceEncode.photo_id == Photos.id)
+                                            .join(Users, Photos.user_id == Users.id).filter(
+                            Users.parent_id == parent_id).all())
+                        for face in face_encode_data:
+                            face_code_lower = face.face_code.lower()
+
+                            is_key_face = FaceEncode.query.filter_by(face_code=face.key_face).first()
+
+                            face_dir = [face_code_lower[i:i + 2] for i in range(0, len(face_code_lower), 2)]
+                            is_match = face_recognition.compare_faces([face_encode], pickle.loads(face.face_encode),
+                                                                      tolerance=0.3)
+                            if is_match and any(is_match) and is_key_face is not None:
+                                if os.path.exists(os.path.join(self.faces_directory, face_dir[0], face_dir[1],
+                                                               face_dir[2], f'{face.face_code}.jpeg')):
+                                    break
+                                count = 1
+                                top, right, bottom, left = face_location
+
+                                # Вычисляем новые координаты обрезки
+                                width = right - left
+                                height = bottom - top
+                                new_width = int(width * 2)
+                                new_height = int(height * 2)
+                                delta_width = (new_width - width) // 2
+                                delta_height = (new_height - height) // 2
+
+                                # Применяем новые координаты обрезки
+                                new_top = max(0, top - delta_height)
+                                new_right = min(image.shape[1], right + delta_width)
+                                new_bottom = min(image.shape[0], bottom + delta_height)
+                                new_left = max(0, left - delta_width)
+
+                                face_image = image[new_top:new_bottom, new_left:new_right]
+                                pil_image = Image.fromarray(face_image)
+                                file = f'/{str(count)}_{data[1]}.jpeg'
+                                pil_image.save(self.faces_directory + file)
+                                face_file_name[data[0]] = file
+                                count += 1
+
+                                path = f'{face_dir[0]}'
+                                count1 = 0
+                                while count1 < 3:
+                                    folder_path = os.path.join(self.faces_directory, path)
+                                    if not os.path.exists(folder_path):
+                                        os.makedirs(folder_path)
+                                    count1 += 1
+                                    if count1 < 3:
+                                        path += f'/{face_dir[count1]}'
+
+                                new_filename = f"{face.face_code}.jpeg"  # Имя файла с новым кодом и расширением
+                                new_image_path = os.path.join(self.faces_directory, face_dir[0], face_dir[1],
+                                                              face_dir[2], new_filename)
+                                file = file.lstrip('/')
+                                old_image_path = os.path.join(self.faces_directory, file)
+                                os.rename(old_image_path, new_image_path)
+
+                                break
 
         for filename in os.listdir(self.download_faces):
             if filename:
@@ -228,8 +228,6 @@ class FaceEncodeHandler:
         for filename in os.listdir(self.faces_directory):
             if filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.HEIC')):
                 os.remove(os.path.join(self.faces_directory, filename))
-
-        return faces
 
     def rotate_image(self, key=None):
         image = Image.open(self.image_path)
@@ -264,15 +262,20 @@ class FaceEncodeHandler:
 
             for photo_id, file_name in photo_list.items():
                 image_path = os.path.join(self.directory, file_name)
-                # if '.HEIC' in file_name:
-                #     temp_img = Image.open(image_path)
-                #     jpeg_photo = image_path.replace('.HEIC', '.jpeg')
-                #     temp_img.save(jpeg_photo)
+
+                image_pil = Image.open(image_path)
+                width, height = image_pil.size
                 image = face_recognition.load_image_file(image_path)
-                face_locations = face_recognition.face_locations(image)
+                face_locations = None
+                if width > 4000 or height > 5000:
+                    face_locations = face_recognition.face_locations(image)
+                else:
+                    face_locations = face_recognition.face_locations(image, model='cnn')
+
                 if len(face_locations) == 0:
                     face_locations = face_recognition.face_locations(image, number_of_times_to_upsample=2)
-                photo_face_encoding = face_recognition.face_encodings(image, face_locations, model='large')
+
+                photo_face_encoding = face_recognition.face_encodings(image, face_locations, model='small')
 
                 face_encodes = []
                 for one_face_encode in photo_face_encoding:
@@ -306,9 +309,14 @@ class FaceEncodeHandler:
                 encode1 = list(entry1.values())[0][0]
                 photo_id1 = list(entry1.keys())[0]
                 code1 = list(entry1.values())[0][1]
-
-                if code1 in check_codes:
+                face = FaceEncode.query.filter_by(face_code=code1).first()
+                if code1 in check_codes or face.not_a_key == True:
                     continue
+
+                check_codes.append(code1)
+
+                face.key_face = code1
+                db.session.commit()
 
                 match_photo_ids = {photo_id1: encode1}
 
@@ -320,12 +328,17 @@ class FaceEncodeHandler:
                     if code2 in check_codes:
                         continue
 
-                    is_match = face_recognition.compare_faces([encode1], encode2)
+                    is_match = face_recognition.compare_faces([encode1], encode2, tolerance=0.6)
 
                     if all(is_match):
                         match_photo_ids[photo_id2] = encode2
-                        check_codes.append(code2)
-                        check_ids.append(photo_id2)
+                        # check_codes.append(code2)
+                        face1 = FaceEncode.query.filter_by(face_code=code2).first()
+                        if code1 != code2:
+                            face1.not_a_key = True
+                        # face1.key_face = code1
+                        db.session.commit()
+
                 temp_dict = {}
                 for key, val in match_photo_ids.items():
                     if key != photo_id1:
@@ -337,20 +350,28 @@ class FaceEncodeHandler:
                             if code in check_codes:
                                 continue
 
-                            is_match = face_recognition.compare_faces([val], encode)
+                            is_match = face_recognition.compare_faces([val], encode, tolerance=0.6)
 
                             if all(is_match):
                                 temp_dict[photo_id] = encode
+                                face1 = FaceEncode.query.filter_by(face_code=code).first()
+                                # if not face1.key_face:
+                                face1.key_face = code1
+                                db.session.commit()
                                 # check_ids.append(photo_id)
                                 check_codes.append(code)
+
                             # elif photo_id in list(match_photo_ids.keys()):
                             #     del temp_dict[photo_id]
 
                 match_photo_ids.update(temp_dict)
+                faces = []
                 face = FaceEncode.query.filter_by(face_code=code1).first()
                 root_face = FaceEncode.query.filter_by(face_code=face.key_face).first()
                 if root_face:
-                    matches.append({root_face.photo_id: [encode1, face.key_face, list(match_photo_ids.keys())]})
+                    if root_face.face_code not in faces:
+                        faces.append(root_face.key_face)
+                        matches.append({photo_id1: [encode1, face.face_code, list(match_photo_ids.keys())]})
                 else:
                     matches.append({photo_id1: [encode1, code1, list(match_photo_ids.keys())]})
             # for i, entry1 in enumerate(pair_face_encodes):
@@ -368,9 +389,10 @@ class FaceEncodeHandler:
                 for key, val in data.items():
                     data[key] = [val[1], val[2]]
                     for i in val[2]:
-                        face = FaceEncode.query.filter_by(photo_id=i).first()
-                        if not face.key_face:
-                            face.key_face = val[1]
+                        faces = FaceEncode.query.filter_by(photo_id=i).all()
+                        for face in faces:
+                            if face.key_face is None:
+                                face.key_face = val[1]
                             db.session.commit()
 
             print(matches)

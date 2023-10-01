@@ -116,12 +116,12 @@ class AddFamilyMemberForm(FlaskForm):
                                   'aria-label': 'Small',
                                   'aria-describedby': 'inputGroup-sizing-sm',
                                   'placeholder': 'Enter name'})
-    relationship = SelectField('Родственная связь', choices=[
-        ('Father', 'Father'),
-        ('Mother', 'Mother'),
-        ('Son', 'Son'),
-        ('Daughter', 'Daughter'),
-        ('Husband', 'Husband'),
-        ('Wife', 'Wife')
+    relationship = SelectField('Родственная связь', validators=[DataRequired()], choices=[
+        ('', 'Relationship'),
+        ('Parent', 'Parent'),
+        ('Child', 'Child'),
+        ('Spouse', 'Spouse'),
+        ('Sibling', 'Sibling')
+
     ], render_kw={'class': 'form-select'})
     submit = SubmitField('Submit', render_kw={'class': 'btn', 'style': ''})

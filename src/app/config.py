@@ -1,5 +1,8 @@
 import os
 from dotenv import load_dotenv, find_dotenv
+import random
+import string
+from src.app.model import FaceEncode
 
 load_dotenv(find_dotenv())
 
@@ -21,3 +24,11 @@ STMP_PASSWORD = os.environ.get('STMP_PASSWORD')
 SQLALCHEMY_DATABASE_URI = os.environ.get('SQLALCHEMY_DATABASE_URI')
 REVOKE_TOKEN = os.environ.get('REVOKE_TOKEN')
 GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY')
+BROKER_URI = os.environ.get('BROKER_URI')
+
+
+def generate_unique_code():
+    while True:
+        code = ''.join(random.choices(string.ascii_letters + string.digits, k=6))
+        if not FaceEncode.query.filter_by(face_code=code).first():
+            return code

@@ -31,6 +31,8 @@ people_face = Blueprint('people', __name__, template_folder='../templates/photo_
 
 db_handler = DBHandler()
 
+face_encode_handler = FaceEncodeHandler()
+
 
 @people_face.route('/', methods=['GET', 'POST'])
 def people():
@@ -49,7 +51,7 @@ def people():
             for face in people_face:
                 decoded_face = pickle.loads(face.face_encode)
                 face_encode.append({face.photo_id: [decoded_face, face.face_code]})
-        list_face_code = Handler.face_folders(face_encode, session, current_user.parent_id)
+        list_face_code = face_encode_handler.face_folders(face_encode)
         existing_files = [file for root, dirs, files in os.walk(faces_directory) for file in files]
         items_to_remove = []
         for i in list_face_code:
@@ -78,7 +80,6 @@ def people():
 
         for item in items_to_remove:
             list_face_code.remove(item)
-        # print(list_face_code)
         session['list_face_code'] = list_face_code
 
         return render_template('photo_templates/people.html', face_dir=list_face_code)

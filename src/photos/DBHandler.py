@@ -47,7 +47,7 @@ class DBHandler:
                                                                    '%Y-%m-%d %H:%M:%S.%f')]
             time_difference = datetime.now() - photo_created_at[0]
 
-            if time_difference >= timedelta(hours=1) or new_photo:      #lifetime session
+            if time_difference >= timedelta(hours=1) or new_photo:
                 photo_tokens = [photo.token for photo in user_photos]
                 unique_photo_tokens = []
                 for token in photo_tokens:
@@ -164,7 +164,7 @@ class DBHandler:
                                                                    '%Y-%m-%d %H:%M:%S.%f')]
             time_difference = datetime.now() - photo_created_at[0]
 
-            if time_difference >= timedelta(days=1) or new_photo:
+            if time_difference >= timedelta(hours=1) or new_photo:
                 try:
                     photo_data_dict = {}  # Dictionary to store photo data
 
@@ -207,7 +207,7 @@ class DBHandler:
                 except PyiCloudFailedLoginException:
                     return ''
 
-            if time_difference <= timedelta(days=1):
+            if time_difference <= timedelta(hours=1):
                 for data in icloud_photos_ids:
                     photo = Photos.query.filter_by(photos_data=data).first()
                     photo_url[photo.id] = {'baseUrl': photo.photos_url,

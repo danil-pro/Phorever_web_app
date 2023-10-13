@@ -11,6 +11,8 @@ import requests
 import google.oauth2.credentials
 from src.photos.DBHandler import DBHandler
 from src.app.model import db, Photos, PhotosMetaData, EditingPermission, Users
+from src.app.init_celery import make_celery
+
 
 db_handler = DBHandler()
 
@@ -44,16 +46,27 @@ def create_app():
     app.config['MAIL_PORT'] = STMP_PORT
     app.config['MAIL_USE_TLS'] = True
     app.config['MAIL_USERNAME'] = STMP_USERNAME  # Здесь указываете вашу почту
-    app.config['MAIL_PASSWORD'] = STMP_PASSWORD  # Здесь указываете пароль от вашей почты
+    app.config['MAIL_PASSWORD'] = STMP_PASSWORD
+
+    app.config.update(
+        CELERY_BROKER_URL=BROKER_URI,  # URL для подключения к Redis
+        CELERY_RESULT_BACKEND='db+' + SQLALCHEMY_DATABASE_URI,  # URL для подключения к PostgreSQL
+    )
+
+    celery = make_celery(app)
+    celery.set_default()
 
     db.init_app(app)
     with app.app_context():
         db.create_all()
     init_login_app(app)
-    return app
+    return app, celery
 
 
-app = create_app()
+app, celery = create_app()
+app.app_context().push()
+
+
 
 
 @app.route('/')

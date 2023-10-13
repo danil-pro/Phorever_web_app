@@ -20,7 +20,8 @@ from pyicloud import PyiCloudService
 from pyicloud.exceptions import PyiCloudFailedLoginException
 
 import requests
-
+from celery import shared_task
+from celery.contrib.abortable import AbortableTask
 from src.app.config import *
 
 register_heif_opener()
@@ -37,114 +38,15 @@ class FaceEncodeHandler:
         self.image_path = ''
         self.file_name = {}
 
-    def download_photos(self, credentials, photo_ids, source_function, key=None):
-        if source_function == '/photos/google_photos':
-            service = build(serviceName=API_SERVICE_NAME,
-                            version=API_VERSION,
-                            credentials=Credentials.from_authorized_user_info(credentials),
-                            static_discovery=False)
-
-            for photo_data in photo_ids:
-                photo_id, photo_url = photo_data.split('|')
-                request = service.mediaItems().get(mediaItemId=photo_id).execute()
-                download_url = request['baseUrl'] + '=d'  # Add '=d' to download the full-size photo
-                response = requests.get(download_url)
-
-                self.image_path = os.path.join(self.directory, request['filename'])
-
-                if response.status_code == 200:
-                    self.file_name[photo_id] = request['filename']
-                    with open(self.image_path,
-                              'wb') as photo_file:
-                        photo_file.write(response.content)
-                        photo_file.close()
-
-                    self.rotate_image(key)
-
-                else:
-                    print('Error downloading the photo')
-        if source_function == '/photos/icloud_photos':
-            icloud_password = keyring.get_password("pyicloud", credentials['apple_id'])
-            api = PyiCloudService(credentials['apple_id'], icloud_password)
-            api.authenticate(force_refresh=True)
-
-            for photo in api.photos.albums['All Photos']:
-                for photo_data in photo_ids:
-                    photo_id, photo_url = photo_data.split('|')
-                    if photo.id == photo_id:
-                        self.image_path = os.path.join(self.directory, photo.filename)
-
-                        self.file_name[photo_id] = photo.filename
-                        download = photo.download()
-                        with open(self.image_path, 'wb') as thumb_file:
-                            thumb_file.write(download.raw.read())
-                            thumb_file.close()
-
-                        # if '.HEIC' in photo.filename:
-                        #     image = Image.open(self.image_path)
-                        #     image.convert('RGB').save(
-                        #         os.path.join(self.directory, os.path.splitext(photo.filename)[0] + '.jpg'))
-
-        return self.face_encode_handler(self.file_name)
-
     def download_face_photos(self, session, photo_ids, parent_id):
         face_file_name = {}
         existing_files = [file for root, dirs, files in os.walk(self.faces_directory) for file in files]
         for face_data in photo_ids:
             for photo_id, data in face_data.items():
-                # is_key_face = FaceEncode.query.filter_by(key_face=data[1]).first()
-                photo = Photos.query.filter_by(photos_data=photo_id).first()
-                with open('GOOGLE_CREDENTIALS.json', 'r') as json_file:
-                    google_credentials = json.load(json_file)
+                self.image_path = os.path.join(self.download_faces, f'{photo_id}.jpeg')
                 if f'{data[1]}.jpeg' not in existing_files:
-                    self.image_path = os.path.join(self.download_faces, f'{data[1]}.jpeg')
-                    if photo.service == '/photos/google_photos':
-                        google_credentials['token'] = photo.token
-                        google_credentials['refresh_token'] = photo.refresh_token
-                        service = build(serviceName=API_SERVICE_NAME,
-                                        version=API_VERSION,
-                                        credentials=Credentials.from_authorized_user_info(google_credentials),
-                                        static_discovery=False)
-
-                        request = service.mediaItems().get(mediaItemId=photo_id).execute()
-                        download_url = request['baseUrl'] + '=d'
-                        response = requests.get(download_url)
-
-                        if response.status_code == 200:
-                            with open(self.image_path,
-                                      'wb') as photo_file:
-                                photo_file.write(response.content)
-                                photo_file.close()
-
-                            self.rotate_image(True)
-
-                    if photo.service == '/photos/icloud_photos':
-                        icloud_password = keyring.get_password("pyicloud", photo.apple_id)
-                        api = PyiCloudService(photo.apple_id, icloud_password)
-                        api.authenticate(force_refresh=True)
-                        icloud_photo_ids = []
-                        for icloud_photo_id in photo_ids:
-                            for icloud_id, _ in icloud_photo_id.items():
-                                icloud_photo_ids.append(icloud_id)
-                        for icloud_photo_id in icloud_photo_ids:
-                            photo_downloaded = False  # Флаг для обозначения, что фотография успешно загружена
-                            for photo in api.photos.albums['All Photos']:
-                                if photo.id == icloud_photo_id:
-                                    download = photo.download()
-                                    with open(self.image_path, 'wb') as thumb_file:
-                                        thumb_file.write(download.raw.read())
-                                        thumb_file.close()
-                                        photo_downloaded = True
-                                    break  # Завершаем внутренний цикл после загрузки фотографии
-                            if photo_downloaded:
-                                for item in photo_ids:
-                                    if icloud_photo_id in item:
-                                        photo_ids.remove(item)
-                                        break
-                                break
-
+                    # os.remove(self.image_path)
                     image = face_recognition.load_image_file(self.image_path)
-                    print(self.image_path)
                     image_pil = Image.open(self.image_path)
                     width, height = image_pil.size
                     face_locations = None
@@ -155,11 +57,6 @@ class FaceEncodeHandler:
 
                     if len(face_locations) == 0:
                         face_locations = face_recognition.face_locations(image, number_of_times_to_upsample=2)
-                    # if not face_locations:
-                    #     face = FaceEncode.query.filter_by(face_code=data[1]).delete()
-                    #     db.session.commit()
-                    #     # os.remove(self.image_path)
-                    #     break
 
                     photo_face_encoding = face_recognition.face_encodings(image, face_locations, model='small')
                     for face_encode, face_location in zip(photo_face_encoding, face_locations):
@@ -178,6 +75,7 @@ class FaceEncodeHandler:
                                 if os.path.exists(os.path.join(self.faces_directory, face_dir[0], face_dir[1],
                                                                face_dir[2], f'{face.face_code}.jpeg')):
                                     break
+
                                 count = 1
                                 top, right, bottom, left = face_location
 
@@ -218,99 +116,26 @@ class FaceEncodeHandler:
                                 file = file.lstrip('/')
                                 old_image_path = os.path.join(self.faces_directory, file)
                                 os.rename(old_image_path, new_image_path)
-
                                 break
-
-        for filename in os.listdir(self.download_faces):
-            if filename:
-                os.remove(os.path.join(self.download_faces, filename))
-
-        for filename in os.listdir(self.faces_directory):
-            if filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.HEIC')):
-                os.remove(os.path.join(self.faces_directory, filename))
-
-    def rotate_image(self, key=None):
-        image = Image.open(self.image_path)
-        exif_orientation = 0x0112
-
-        if hasattr(image, '_getexif') and isinstance(image._getexif(), dict):
-            exif = image._getexif()
-            if exif is not None and exif_orientation in exif:
-                orientation = exif[exif_orientation]
-                # Определение нужного угла поворота
-                if orientation == 3:
-                    angle = 180
-                elif orientation == 6:
-                    angle = 270
-                elif orientation == 8:
-                    angle = 90
-                else:
-                    angle = 0
-            else:
-                angle = 0
-        else:
-            angle = 0
-
-        # Поворот изображения
-        if angle != 0:
-            rotated_image = image.rotate(angle, expand=True)
-            rotated_image.save(self.image_path)
-
-    def face_encode_handler(self, photo_list):
-        try:
-            face_encode = {}
-
-            for photo_id, file_name in photo_list.items():
-                image_path = os.path.join(self.directory, file_name)
-
-                image_pil = Image.open(image_path)
-                width, height = image_pil.size
-                image = face_recognition.load_image_file(image_path)
-                face_locations = None
-                if width > 4000 or height > 5000:
-                    face_locations = face_recognition.face_locations(image)
-                else:
-                    face_locations = face_recognition.face_locations(image, model='cnn')
-
-                if len(face_locations) == 0:
-                    face_locations = face_recognition.face_locations(image, number_of_times_to_upsample=2)
-
-                photo_face_encoding = face_recognition.face_encodings(image, face_locations, model='small')
-
-                face_encodes = []
-                for one_face_encode in photo_face_encoding:
-                    face_encode_xyz = np.array(one_face_encode)
-                    face_encodes.append(pickle.dumps(face_encode_xyz))
-
-                face_encode[photo_id] = face_encodes
-
-                os.remove(image_path)
-
-            return face_encode
-        except Exception as e:
-            print(e)
+                if os.path.exists(self.image_path):
+                    os.remove(self.image_path)
 
     def face_recognition_handler(self, face_encodes):
         try:
             matches = []
 
-            check_ids = []
             check_codes = []
             all_ids = []
             for entry in face_encodes:
                 for i in entry.keys():
                     all_ids.append(i)
 
-            pair = [x for x in all_ids if all_ids.count(x) > 1]
-
-            not_pair_face_encodes = [entry for entry in face_encodes if list(entry.keys())[0] not in pair]
-            pair_face_encodes = [entry for entry in face_encodes if list(entry.keys())[0] in pair]
             for i, entry1 in enumerate(face_encodes):
                 encode1 = list(entry1.values())[0][0]
                 photo_id1 = list(entry1.keys())[0]
                 code1 = list(entry1.values())[0][1]
                 face = FaceEncode.query.filter_by(face_code=code1).first()
-                if code1 in check_codes or face.not_a_key == True:
+                if code1 in check_codes:
                     continue
 
                 check_codes.append(code1)
@@ -328,7 +153,7 @@ class FaceEncodeHandler:
                     if code2 in check_codes:
                         continue
 
-                    is_match = face_recognition.compare_faces([encode1], encode2, tolerance=0.6)
+                    is_match = face_recognition.compare_faces([encode1], encode2, tolerance=0.55)
 
                     if all(is_match):
                         match_photo_ids[photo_id2] = encode2
@@ -374,16 +199,6 @@ class FaceEncodeHandler:
                         matches.append({photo_id1: [encode1, face.face_code, list(match_photo_ids.keys())]})
                 else:
                     matches.append({photo_id1: [encode1, code1, list(match_photo_ids.keys())]})
-            # for i, entry1 in enumerate(pair_face_encodes):
-            #     encode11 = list(entry1.values())[0][0]
-            #     photo_id11 = list(entry1.keys())[0]
-            #     for data in matches:
-            #         for key1, val1 in data.items():
-            #             if photo_id11 in val1[2]:
-            #                 continue
-            #             is_match = face_recognition.compare_faces([encode11], val1[0])
-            #             if all(is_match):
-            #                 val1[2].append(photo_id11)
 
             for data in matches:
                 for key, val in data.items():
@@ -401,3 +216,17 @@ class FaceEncodeHandler:
         except Exception as e:
             print(e)
             return ''
+
+    def face_folders(self, face_encode):
+        list_face_code = []
+
+        existing_files = [file for root, dirs, files in os.walk(self.faces_directory) for file in files]
+        family_face_recognition = self.face_recognition_handler(face_encode)
+        for i in family_face_recognition:
+            for photo_id, photo_ids in i.items():
+                formatted_face_code = "/".join([photo_ids[0][i:i + 2] for i in range(0, len(photo_ids[0]), 2)])
+
+                if f'{photo_ids[0]}.jpeg' in existing_files:
+                    list_face_code.append({photo_id: [formatted_face_code.lower(), f'{photo_ids[0]}']})
+
+        return list_face_code

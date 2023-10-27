@@ -8,15 +8,17 @@ from src.app.config import *
 from src.oauth2.Oauth2_Connector import GoogleOauth2Connect, DropboxOauth2Connect
 from src.app.Forms import IcloudLoginForm, VerifyVerificationCodeForm, ICloudVerifyForm
 from src.app.model import Users, db
+from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, JWTManager
 
 import keyring
 from pyicloud import PyiCloudService
 from pyicloud.exceptions import PyiCloudFailedLoginException
+from flask_caching import Cache
 
 
 oauth2 = Blueprint('oauth2', __name__, template_folder='../templates', static_folder='../static')
 current_dir = os.path.dirname(os.path.abspath(__file__))
-
+cache = Cache()
 CLIENT_SECRETS_FILE = CLIENT_SECRETS_FILE
 
 absolute_path = os.path.join(current_dir, CLIENT_SECRETS_FILE)
@@ -29,6 +31,11 @@ API_VERSION = API_VERSION
 GOOGLE_REDIRECT_URI = GOOGLE_REDIRECT_URI
 google_auth = GoogleOauth2Connect(CLIENT_SECRETS_FILE, SCOPES, API_SERVICE_NAME, API_VERSION)
 
+
+def oauth2_init_app(app):
+    cache.init_app(app, config={'CACHE_TYPE': 'simple'})
+
+
 authenticator = DropboxOauth2Connect(
     app_key=APP_KEY,
     app_secret=APP_SECRET,
@@ -38,7 +45,8 @@ authenticator = DropboxOauth2Connect(
 
 
 @oauth2.route('/google_authorize')
-def google_authorize():
+# @jwt_required()
+def google_authorize(user_id):
     flow = Flow.from_client_secrets_file(
         google_auth.client_secret_file,
         scopes=google_auth.scopes,
@@ -47,23 +55,29 @@ def google_authorize():
     authorization_url, state = flow.authorization_url(
         prompt='consent',
         access_type='offline',
-        include_granted_scopes='true'
+        include_granted_scopes='true',
+
     )
-    session['state'] = state
-    return redirect(authorization_url)
+    user = Users.query.filter_by(id=user_id).first()
+    user.state = state
+    db.session.add(user)
+    db.session.commit()
+    return authorization_url
 
 
 @oauth2.route('/google_oauth2callback')
 def google_oauth2callback():
     try:
-        state = session['state']
+        state = request.args.get('state')
+        user = Users.query.filter_by(state=state).first()
+        print(user.id)
         credentials = google_auth.build_credentials(request.url)
-        session['credentials'] = google_auth.credentials_to_dict(credentials)
+        google_auth.credentials_add_to_db(credentials, user.id)
 
-        return redirect(url_for('user_photos'))
+        return {'message': 'ok'}
     except Exception as e:
         print(e)
-        return redirect(url_for('index'))
+        return redirect(url_for('auth.login'))
 
 
 @oauth2.route('/google_logout', methods=['GET'])
@@ -73,6 +87,19 @@ def google_logout():
             del session['credentials']
             return flask.redirect(url_for('oauth2.google_authorize'))
     return redirect(url_for('auth.login'))
+
+
+def credentials_to_dict(user_id):
+    user = Users.query.filter_by(id=user_id).first()
+    with open('GOOGLE_CREDENTIALS.json', 'r') as json_file:
+        google_credentials = json.load(json_file)
+
+    return {'token': user.google_token,
+            'refresh_token': user.google_refresh_token,
+            'token_uri': google_credentials['token_uri'],
+            'client_id': google_credentials['client_id'],
+            'client_secret': google_credentials['client_secret'],
+            'scopes': google_credentials['scopes']}
 
 
 @oauth2.route('/dropbox_authorize')

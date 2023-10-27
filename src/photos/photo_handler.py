@@ -1,10 +1,11 @@
-# import json
+import json
 import os
 import pickle
 
 import flask
 from flask import *
 from src.auth.auth import current_user
+from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, JWTManager, get_current_user
 
 from google.oauth2.credentials import Credentials
 
@@ -16,20 +17,29 @@ from dropbox import files, sharing
 from src.app.model import db, Photos, Users, PhotosMetaData, EditingPermission, FaceEncode, Person
 from src.photos.DBHandler import DBHandler
 from src.face_recognition.download_photos import download_photos
-from src.oauth2.oauth2 import authenticator
+from src.oauth2.oauth2 import authenticator, google_authorize, credentials_to_dict
 from src.app.Forms import UpdateForm, UpdateLocationForm, UpdateCreationDateForm, AddFaceName, AddFamilyMemberForm
+from src.app.config import BASE
 
 import asyncio
+
 
 import src.photos.Handler as Handler
 # import json
 from pyicloud import PyiCloudService
 import keyring
 from pyicloud.exceptions import PyiCloudNoStoredPasswordAvailableException, PyiCloudFailedLoginException
+from flask_restful import Api, Resource, reqparse
 
 photos = Blueprint('photos', __name__, template_folder='../templates/photo_templates', static_folder='../static')
 
 db_handler = DBHandler()
+api = Api()
+
+
+def photos_init_app(app):
+    api.init_app(app)
+
 
 # handler = src.photos.Handler
 # family_tree_relationships = FamilyTree()
@@ -307,3 +317,150 @@ def add_editing_permission():
         return redirect(url_for('user_photos'))
     else:
         return redirect(url_for('auth.login'))
+
+
+next_page_token_data = reqparse.RequestParser()
+next_page_token_data.add_argument("next_page_token", type=str, help="next_page_token")
+
+
+class UserPhotos(Resource):
+    @jwt_required()
+    def get(self):
+        api_current_user = Users.query.filter_by(id=get_jwt_identity()).first()
+        credentials = credentials_to_dict(api_current_user.id)
+        # print(g.user)
+        if api_current_user.google_token is None and api_current_user.google_refresh_token is None:
+            return {'google uri': google_authorize(api_current_user.id)}
+
+        family_photos = Photos.query.filter(Users.parent_id == api_current_user.parent_id,
+                                            Photos.user_id == Users.id).all()
+        photo_urls = db_handler.get_photos_from_db(family_photos, credentials)
+        current_user_family = Users.query.filter_by(parent_id=api_current_user.parent_id).all()
+        photo_data = {}
+        family_users = []
+
+        for family_user in current_user_family:
+            # print(family_user.email)
+            photos_data = {}
+            for photo_id, data in photo_urls.items():
+                photos_meta_data = PhotosMetaData.query.filter_by(photo_id=photo_id).first()
+                if not photos_meta_data:
+                    photos_data[photo_id] = {'baseUrl': data['baseUrl'],
+                                             'title': 'Empty title',
+                                             'description': data['description'],
+                                             'location': 'Empty location',
+                                             'creation_data': data['creationTime']}
+                else:
+                    photos_data[photo_id] = {'baseUrl': data['baseUrl'],
+                                             'title': photos_meta_data.title,
+                                             'description': photos_meta_data.description,
+                                             'location': photos_meta_data.location,
+                                             'creation_data': photos_meta_data.creation_data}
+            for i, k in photos_data.items():
+                user_photo = Photos.query.filter_by(id=i).first()
+                if family_user.id == user_photo.user_id:
+                    if family_user.email not in photo_data:
+                        photo_data[family_user.email] = {i: k}
+                    else:
+                        photo_data[family_user.email][i] = k
+            family_users.append(family_user.email)
+        return photo_data, 302
+
+
+class GooglePhotos(Resource):
+    @jwt_required()
+    def get(self):
+        api_current_user = Users.query.filter_by(id=get_jwt_identity()).first()
+        credentials = credentials_to_dict(api_current_user.id)
+        print(api_current_user.state)
+        # print(g.user)
+        if api_current_user.google_token is None and api_current_user.google_refresh_token is None:
+            return {'google_uri': google_authorize(api_current_user.id)}
+        try:
+            credentials = Credentials.from_authorized_user_info(credentials)
+
+            photos_data, next_page_token = Handler.photo_from_google(credentials, None)
+
+            user_photo_ids = [photo.photos_data for photo in Photos.query.filter().all()
+                              if photo.service == '/photos/google_photos']
+            if not photos_data:
+                flash('No photo', 'info')
+                return {'message': 'no photos on account'}
+            for user_photo_id in user_photo_ids:
+                for data in photos_data:
+                    if user_photo_id == data['photoId']:
+                        photos_data.remove(data)
+
+            return {'google_photos_data': photos_data, 'next_page_token': next_page_token if next_page_token else ''}
+        except AuthError as e:
+            print(e)
+
+    @jwt_required()
+    def post(self):
+        args = next_page_token_data.parse_args()
+        api_current_user = Users.query.filter_by(id=get_jwt_identity()).first()
+        credentials = credentials_to_dict(api_current_user.id)
+        # print(g.user)
+        if api_current_user.google_token is None and api_current_user.google_refresh_token is None:
+            return {'google_uri': google_authorize(api_current_user.id)}
+        try:
+            credentials = Credentials.from_authorized_user_info(credentials)
+            next_page_token = args.get('next_page_token')
+            if next_page_token:
+                photos_data, next_page_token = Handler.photo_from_google(credentials, next_page_token)
+            else:
+                photos_data, next_page_token = Handler.photo_from_google(credentials, None)
+
+            user_photo_ids = [photo.photos_data for photo in Photos.query.filter().all()
+                              if photo.service == '/photos/google_photos']
+            if not photos_data:
+                return {'message': 'no photos on account'}
+            for user_photo_id in user_photo_ids:
+                for data in photos_data:
+                    if user_photo_id == data['photoId']:
+                        photos_data.remove(data)
+
+            return {'google_photos_data': photos_data, 'next_page_token': next_page_token if next_page_token else ''}
+        except AuthError as e:
+            print(e)
+
+
+api_photos_data = reqparse.RequestParser()
+api_photos_data.add_argument("photos_data", type=dict, help="photos_data is required", required=True)
+
+
+class AddPhotos(Resource):
+
+    @jwt_required()
+    def post(self):
+        api_current_user = Users.query.filter_by(id=get_jwt_identity()).first()
+        if api_current_user.google_token is None and api_current_user.google_refresh_token is None:
+            return {'google_uri': google_authorize(api_current_user.id)}
+        args = api_photos_data.parse_args()
+        if args:
+            photos_data = args.get('photos_data')
+            for photo_id, photo_url in photos_data.items():
+                source_function = None
+                if 'googleusercontent.com' in photo_url:
+                    source_function = '/photos/google_photos'
+                photo = Photos(photos_data=photo_id, photos_url=photo_url, service=source_function,
+                               token=api_current_user.google_token,
+                               refresh_token=api_current_user.google_refresh_token,
+                               apple_id=None,
+                               user_id=api_current_user.id)
+                db.session.add(photo)
+            # if source_function == '/photos/google_photos':
+            #     download_photos.delay(session['credentials'], photos_data, source_function,
+            #                           current_user.id)
+            # elif source_function == '/photos/icloud_photos':
+            #     download_photos.delay(session['icloud_credentials'], photos_data,
+            #                           source_function, current_user.id)
+
+            db.session.commit()
+
+        return {'message': 'ok'}
+
+
+api.add_resource(UserPhotos, '/photos/api/user_photos')
+api.add_resource(GooglePhotos, '/photos/api/google_photos')
+api.add_resource(AddPhotos, '/photos/api/add_photos')

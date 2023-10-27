@@ -1,17 +1,20 @@
-from src.auth.auth import auth, init_login_app, current_user
-from src.oauth2.oauth2 import oauth2
-from src.photos.photo_handler import photos
+from src.auth.auth import http_auth, auth, init_app, current_user
+from src.oauth2.oauth2 import oauth2, oauth2_init_app
+from src.photos.photo_handler import photos, photos_init_app
 from src.family_tree.family_tree import family_tree
 from src.face_recognition.people_face_recognition import people_face
 from src.app.config import *
 from src.app.Forms import UpdateForm, UpdateCreationDateForm, UpdateLocationForm
 from flask import *
+from flask_login import login_required
 from google.oauth2.credentials import Credentials
 import requests
 import google.oauth2.credentials
 from src.photos.DBHandler import DBHandler
 from src.app.model import db, Photos, PhotosMetaData, EditingPermission, Users
 from src.app.init_celery import make_celery
+from flask_restful import Api, Resource
+from datetime import timedelta
 
 
 db_handler = DBHandler()
@@ -36,6 +39,8 @@ def create_app():
     app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
 
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    app.config['JWT_SECRET_KEY'] = 'furhfwuhuwfhfwuiwu83heuhdfuheufheuhfe'
+    app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=1)
 
     app.config['USER_APP_NAME'] = 'Forever_app'
     app.config['USER_ENABLE_EMAIL'] = False
@@ -59,14 +64,15 @@ def create_app():
     db.init_app(app)
     with app.app_context():
         db.create_all()
-    init_login_app(app)
+    init_app(app)
+    oauth2_init_app(app)
+    photos_init_app(app)
     return app, celery
 
 
 app, celery = create_app()
 app.app_context().push()
-
-
+api = Api(app)
 
 
 @app.route('/')
@@ -109,12 +115,67 @@ def user_photos():
                     else:
                         photo_data[family_user.email][i] = k
             family_users.append(family_user.email)
+        print(photo_data)
         return render_template('photo_templates/user_photo.html', photos=photo_data,
                                parent_id=current_user.parent_id, family_users=family_users,
                                permissions=EditingPermission,
                                form=form, location_form=location_form, creation_date_form=creation_date_form)
     else:
         return redirect(url_for('auth.login'))
+
+
+    # else:
+    #     return {'message': 'please log in'}
+
+# class UserPhotos(Resource):
+#     @login_required
+#     def get(self):
+#         # return {'message': 'hui'}
+#         # # if current_user.is_authenticated:
+#         if 'credentials' not in session:
+#             return {'message': 'hui'}
+#         #
+#         # form = UpdateForm(request.form)
+#         # location_form = UpdateLocationForm(request.form)
+#         # creation_date_form = UpdateCreationDateForm(request.form)
+#         family_photos = Photos.query.filter(Users.parent_id == current_user.parent_id,
+#                                             Photos.user_id == Users.id).all()
+#         photo_urls = db_handler.get_photos_from_db(family_photos, session['credentials'])
+#         current_user_family = Users.query.filter_by(parent_id=current_user.parent_id).all()
+#         photo_data = {}
+#         family_users = []
+#
+#         for family_user in current_user_family:
+#             # print(family_user.email)
+#             photos_data = {}
+#             for photo_id, data in photo_urls.items():
+#                 photos_meta_data = PhotosMetaData.query.filter_by(photo_id=photo_id).first()
+#                 if not photos_meta_data:
+#                     photos_data[photo_id] = {'baseUrl': data['baseUrl'],
+#                                              'title': 'Empty title',
+#                                              'description': data['description'],
+#                                              'location': 'Empty location',
+#                                              'creation_data': data['creationTime']}
+#                 else:
+#                     photos_data[photo_id] = {'baseUrl': data['baseUrl'],
+#                                              'title': photos_meta_data.title,
+#                                              'description': photos_meta_data.description,
+#                                              'location': photos_meta_data.location,
+#                                              'creation_data': photos_meta_data.creation_data}
+#             for i, k in photos_data.items():
+#                 user_photo = Photos.query.filter_by(id=i).first()
+#                 if family_user.id == user_photo.user_id:
+#                     if family_user.email not in photo_data:
+#                         photo_data[family_user.email] = {i: k}
+#                     else:
+#                         photo_data[family_user.email][i] = k
+#             family_users.append(family_user.email)
+#         return jsonify(photo_data), 302
+        # else:
+        #     return {'message': 'please log in'}
+
+
+# api.add_resource(UserPhotos, '/auth/api/user_photos')
 
 
 @app.route('/session_clear')

@@ -1,6 +1,9 @@
 from flask_sqlalchemy import SQLAlchemy
 from flask_user import UserMixin
 from datetime import datetime
+from passlib.apps import custom_app_context as pwd_context
+import jwt
+import time
 
 db = SQLAlchemy()
 
@@ -12,8 +15,11 @@ class Users(db.Model, UserMixin):
     is_verified = db.Column(db.Boolean, default=False)
     verification_token = db.Column(db.String(10), unique=True, nullable=True)
     parent_token = db.Column(db.String(10), nullable=True)
+    state = db.Column(db.String(225), nullable=True)
     parent_id = db.Column(db.Integer, nullable=True)
-    apple_id = db.Column(db.String(256), nullable=True)
+    apple_id = db.Column(db.String(225), nullable=True)
+    google_token = db.Column(db.String(255), nullable=True)
+    google_refresh_token = db.Column(db.String(255), nullable=True)
 
     def __init__(self, email, password):
         self.email = email

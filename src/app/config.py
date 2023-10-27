@@ -25,6 +25,7 @@ SQLALCHEMY_DATABASE_URI = os.environ.get('SQLALCHEMY_DATABASE_URI')
 REVOKE_TOKEN = os.environ.get('REVOKE_TOKEN')
 GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY')
 BROKER_URI = os.environ.get('BROKER_URI')
+BASE = os.environ.get('BASE')
 
 
 def generate_unique_code():

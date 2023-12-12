@@ -14,7 +14,7 @@ from collections import Counter
 import re
 from pillow_heif import register_heif_opener
 
-from src.app.model import db, FaceEncode, Users, Photos
+from src.app.model import db, FaceEncode, User, Photo
 import keyring
 from pyicloud import PyiCloudService
 from pyicloud.exceptions import PyiCloudFailedLoginException
@@ -43,6 +43,7 @@ class FaceEncodeHandler:
         existing_files = [file for root, dirs, files in os.walk(self.faces_directory) for file in files]
         for face_data in photo_ids:
             for photo_id, data in face_data.items():
+                photo_id = photo_id.replace('/', '____')
                 self.image_path = os.path.join(self.download_faces, f'{photo_id}.jpeg')
                 if f'{data[1]}.jpeg' not in existing_files:
                     # os.remove(self.image_path)
@@ -60,9 +61,9 @@ class FaceEncodeHandler:
 
                     photo_face_encoding = face_recognition.face_encodings(image, face_locations, model='small')
                     for face_encode, face_location in zip(photo_face_encoding, face_locations):
-                        face_encode_data = (FaceEncode.query.join(Photos, FaceEncode.photo_id == Photos.id)
-                                            .join(Users, Photos.user_id == Users.id).filter(
-                            Users.parent_id == parent_id).all())
+                        face_encode_data = (FaceEncode.query.join(Photo, FaceEncode.photo_id == Photo.id)
+                                            .join(User, Photo.user_id == User.id).filter(
+                            User.parent_id == parent_id).all())
                         for face in face_encode_data:
                             face_code_lower = face.face_code.lower()
 
@@ -227,6 +228,8 @@ class FaceEncodeHandler:
                 formatted_face_code = "/".join([photo_ids[0][i:i + 2] for i in range(0, len(photo_ids[0]), 2)])
 
                 if f'{photo_ids[0]}.jpeg' in existing_files:
-                    list_face_code.append({photo_id: [formatted_face_code.lower(), f'{photo_ids[0]}']})
-
+                    list_face_code.append({'face_path': f'../../static/img/user_photos/faces/'
+                                                      f'{ formatted_face_code.lower() }/'
+                                                      f'{ photo_ids[0] }.jpeg',
+                                                      'face_code': f'{photo_ids[0]}', 'photo_id': photo_id})
         return list_face_code

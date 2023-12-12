@@ -3,7 +3,7 @@ from src.app.Forms import RegisterForm, LoginForm
 from flask_login import LoginManager, login_user, current_user, logout_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask import *
-from src.app.model import db, Users
+from src.app.model import db, User
 from flask_mail import Mail, Message
 import random
 import string
@@ -25,7 +25,7 @@ def init_app(app):
     login_manager.init_app(app)
     jwt.init_app(app)
     mail.init_app(app)
-    UserManager(app, db, Users)
+    UserManager(app, db, User)
 
 
 def send_email(email, message, body):
@@ -37,16 +37,7 @@ def send_email(email, message, body):
 @login_manager.user_loader
 def load_user(email):
     print('ok')
-    return Users.query.filter_by(email=email).first()
-
-
-@http_auth.verify_password
-def verify_password(email, password):
-    user = Users.query.filter_by(email=email).first()
-    if not user:
-        return False
-    g.user = user
-    return True
+    return User.query.filter_by(email=email).first()
 
 
 @auth.route('/register/<parent_token>', methods=['GET', 'POST'])
@@ -57,17 +48,17 @@ def register(parent_token=None):
     form = RegisterForm(request.form)
     if request.method == 'POST' and form.validate():
         password = generate_password_hash(form.password.data)
-        user = Users.query.filter_by(email=form.email.data).first()
+        user = User.query.filter_by(email=form.email.data).first()
         if user:
             flash('Пользователь с таким адресом электронной почты уже зарегистрирован.')
             return redirect(url_for('auth.register'))
-        new_user = Users(email=form.email.data, password=password)
+        new_user = User(email=form.email.data, password=password)
         new_user.verification_token = str(random.randint(100000, 999999))
         parent_token = request.form.get('parent_token')
         if parent_token == 'None':
             new_user.parent_id = None
         else:
-            parent_user = Users.query.filter_by(parent_token=parent_token).first()
+            parent_user = User.query.filter_by(parent_token=parent_token).first()
             if not parent_user:
                 flash('The user who invited you does not exist')
                 return redirect(url_for('auth.register'))
@@ -161,25 +152,28 @@ def profile():
 create_user = reqparse.RequestParser()
 create_user.add_argument("email", type=str, help="User email is required", required=True)
 create_user.add_argument("password", type=str, help="User password is required", required=True)
-create_user.add_argument("parent_token", type=str, help="User parent token")
+create_user.add_argument("confirm_password", type=str, help="User password is required", required=True)
+create_user.add_argument("invite_token", type=str, help="User parent token")
 
 
 class SingUp(Resource):
     def post(self):
         args = create_user.parse_args()
         password = generate_password_hash(args.get('password'))
-        user = Users.query.filter_by(email=args.get('email')).first()
+        user = User.query.filter_by(email=args.get('email')).first()
         if user:
-            return {'message': 'user exist'}
-        new_user = Users(email=args.get('email'), password=password)
+            return {'message': 'User exist'}, 409
+        if args.get('password') != args.get('confirm_password'):
+            return {'message': 'Password mismatch'}, 401
+        new_user = User(email=args.get('email'), password=password)
         new_user.verification_token = str(random.randint(100000, 999999))
-        parent_token = args.get('parent_token')
+        parent_token = args.get('invite_token')
         if parent_token is None:
             new_user.parent_id = None
         else:
-            parent_user = Users.query.filter_by(parent_token=parent_token).first()
+            parent_user = User.query.filter_by(parent_token=parent_token).first()
             if not parent_user:
-                return {'message': 'The user who invited does not exist'}
+                return {'message': 'The user who invited does not exist'}, 404
             if parent_user.parent_id:
                 new_user.parent_id = parent_user.parent_id
             else:
@@ -194,7 +188,7 @@ class SingUp(Resource):
         {url_for('auth.verify_email', email=args.get('email'), token=new_user.verification_token, _external=True)}
         Если вы не запрашивали подтверждение своей электронной почты, то просто проигнорируйте это сообщение.
         ''')
-        return {'message': 'ok'}, 200
+        return {'success': True, 'data': {'user': new_user.email, 'code': 200, 'message': 'OK'}}, 200
 
 
 user_login = reqparse.RequestParser()
@@ -209,22 +203,20 @@ class SingIn(Resource):
         password = args.get('password')
         user = load_user(email)
         if not user:
-            return {'message': 'no user'}
+            return {'message': 'User not found'}, 404
 
         if user and not user.is_verified:
-            return {'message': 'email is not verified'}, 201
+            return {'message': 'Email is not verified'}, 403
 
         if user.password and check_password_hash(user.password, password):
-            # verify_password(email, password)
-            # current_user.is_authenticated = True
-            # session['hui'] = email
+
             access_token = create_access_token(identity=user.id)
-            g.user = user
-            return {'access_token': access_token}
+            return {'success': True, 'data': {'user': user.email, 'access_token': access_token,
+                                              'code': 200, 'message': 'OK'}}, 200
         else:
-            return {'message': 'incorrect email or password'}
+            return {'message': 'Incorrect email or password'}, 401
 
 
-api.add_resource(SingUp, '/auth/api/sing_up')
-api.add_resource(SingIn, '/auth/api/sing_in')
+api.add_resource(SingUp, '/api/v1/auth/sing_up')
+api.add_resource(SingIn, '/api/v1/auth/sing_in')
 

@@ -8,9 +8,10 @@ import dropbox
 from dropbox.oauth import DropboxOAuth2Flow
 from dropbox.exceptions import AuthError
 from dropbox import files, sharing
-from src.app.model import db, Users
+from src.app.model import db, User
 
 import src.app.config
+import time
 
 config = src.app.config
 
@@ -40,11 +41,12 @@ class GoogleOauth2Connect:
         return credentials
 
     def credentials_add_to_db(self, credentials, user_id):
-        user = Users.query.filter_by(id=user_id).first()
+        user = User.query.filter_by(id=user_id).first()
 
         if user:
             user.google_token = credentials.token
             user.google_refresh_token = credentials.refresh_token
+            user.google_credentials_create_at = int(time.time())
 
             db.session.add(user)
 

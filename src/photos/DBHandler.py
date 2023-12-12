@@ -1,6 +1,7 @@
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from google.auth.exceptions import RefreshError
+from google.auth.transport.requests import Request
 from googleapiclient.errors import HttpError
 from datetime import datetime, timedelta
 from flask import redirect, url_for
@@ -20,7 +21,7 @@ import requests
 
 from src.app.config import *
 
-from src.app.model import Photos, db, PhotosMetaData
+from src.app.model import Photo, db, PhotoMetaData
 import json
 
 
@@ -29,7 +30,7 @@ class DBHandler:
         pass
 
     def get_photos_from_db(self, user_photos, credentials):
-        photo_url = {}
+        photo_url = []
         google_photo_ids = [photo.photos_data for photo in user_photos if
                             photo.service == '/photos/google_photos']
         dropbox_photos_urls = [photo.photos_data for photo in user_photos if
@@ -48,13 +49,16 @@ class DBHandler:
             time_difference = datetime.now() - photo_created_at[0]
 
             if time_difference >= timedelta(hours=1) or new_photo:
-                photo_tokens = [photo.token for photo in user_photos]
+
+                photo_tokens = [photo.token for photo in user_photos if
+                                photo.service == '/photos/google_photos']
                 unique_photo_tokens = []
                 for token in photo_tokens:
                     if token and token not in unique_photo_tokens:
                         unique_photo_tokens.append(token)
 
-                photo_refresh_tokens = [photo.refresh_token for photo in user_photos]
+                photo_refresh_tokens = [photo.refresh_token for photo in user_photos if
+                                        photo.service == '/photos/google_photos']
                 unique_photo_refresh_tokens = []
                 for refresh_token in photo_refresh_tokens:
                     if refresh_token and refresh_token not in unique_photo_refresh_tokens:
@@ -73,9 +77,14 @@ class DBHandler:
                         if new_photo:
                             photo_iterator = iter(new_photo)
 
+                        auth_credentials = Credentials.from_authorized_user_info(google_credentials)
+                        if not auth_credentials.valid:
+                            if auth_credentials.refresh_token:
+                                auth_credentials.refresh(Request())
+
                         drive = build(serviceName=API_SERVICE_NAME,
                                       version=API_VERSION,
-                                      credentials=Credentials.from_authorized_user_info(google_credentials),
+                                      credentials=auth_credentials,
                                       static_discovery=False)
                         while True:
                             chunk = list(itertools.islice(photo_iterator, 50))
@@ -87,46 +96,56 @@ class DBHandler:
                                     if 'mediaItem' in items:
                                         media_item = items['mediaItem']
                                         media_meta_data = media_item['mediaMetadata']
-                                        photo = Photos.query.filter_by(photos_data=media_item['id']).first()
+                                        photo = Photo.query.filter_by(photos_data=media_item['id']).first()
                                         photo.photos_url = media_item['baseUrl']
+                                        photo.google_token = auth_credentials.token
                                         photo.created_at = datetime.now()
-                                        photo_meta_data = PhotosMetaData.query.filter_by(photo_id=photo.id).first()
+                                        photo_meta_data = PhotoMetaData.query.filter_by(photo_id=photo.id).first()
                                         if 'description' not in media_item:
-                                            photo_url[photo.id] = {'baseUrl': media_item['baseUrl'],
-                                                                   'title': 'Empty title',
-                                                                   'description': 'Empty description',
-                                                                   'location': 'Empty location',
-                                                                   'creationTime':
-                                                                       media_meta_data['creationTime'].split('T')[0]}
+                                            photo_url.append({'baseUrl': media_item['baseUrl'],
+                                                              'title': 'Empty title',
+                                                              'description': 'Empty description',
+                                                              'location': 'Empty location',
+                                                              'creationTime':
+                                                                  media_meta_data['creationTime'].split('T')[0],
+                                                              'photo_id': photo.id})
                                             if not photo_meta_data:
-                                                new_photo_meta_data = PhotosMetaData(title='Empty title',
-                                                                                     description='Empty description',
-                                                                                     location='Empty location',
-                                                                                     creation_data=media_meta_data[
-                                                                                         'creationTime'].split('T')[0],
-                                                                                     photo_id=photo.id)
+                                                unix_time = int(datetime.strptime(media_meta_data['creationTime'].
+                                                                                  split('T')[0],
+                                                                                  '%Y-%m-%d').timestamp())
+                                                new_photo_meta_data = PhotoMetaData(title='Empty title',
+                                                                                    description='Empty description',
+                                                                                    location='Empty location',
+                                                                                    creation_data=unix_time,
+                                                                                    photo_id=photo.id)
                                                 db.session.add(new_photo_meta_data)
                                         else:
-                                            photo_url[photo.id] = {'baseUrl': media_item['baseUrl'],
-                                                                   'title': 'Empty title',
-                                                                   'description': media_item['description'],
-                                                                   'location': 'Empty location',
-                                                                   'creationTime':
-                                                                       media_meta_data['creationTime'].split('T')[0]}
+                                            unix_time = int(datetime.strptime(media_meta_data['creationTime'].
+                                                                              split('T')[0], '%Y-%m-%d').timestamp())
+
+                                            photo_url.append({'baseUrl': media_item['baseUrl'],
+                                                              'title': 'Empty title',
+                                                              'description': media_item['description'],
+                                                              'location': 'Empty location',
+                                                              'creationTime': unix_time,
+                                                              'photo_id': photo.id})
                                             if not photo_meta_data:
-                                                new_photo_meta_data = PhotosMetaData(title='Empty title',
-                                                                                     description=media_item[
-                                                                                         'description'],
-                                                                                     location='Empty location',
-                                                                                     creation_data=media_meta_data[
-                                                                                         'creationTime'].split('T')[0],
-                                                                                     photo_id=photo.id)
+                                                unix_time = int(datetime.strptime(media_meta_data['creationTime'].
+                                                                                  split('T')[0],
+                                                                                  '%Y-%m-%d').timestamp())
+                                                new_photo_meta_data = PhotoMetaData(title='Empty title',
+                                                                                    description=media_item[
+                                                                                        'description'],
+                                                                                    location='Empty location',
+                                                                                    creation_data=unix_time,
+                                                                                    photo_id=photo.id)
                                                 db.session.add(new_photo_meta_data)
                                         db.session.commit()
 
                             break
 
                     except RefreshError as e:
+                        print(e)
                         credentials_dict = Credentials(
                             **credentials)
 
@@ -140,18 +159,19 @@ class DBHandler:
                         else:
                             print('An error occurred.' + str(status_code) + str(e))
                             return 'An error occurred.' + str(status_code) + str(e)
-            if time_difference <= timedelta(days=1):
+            if time_difference <= timedelta(hours=1):
                 for data in google_photo_ids:
-                    photo = Photos.query.filter_by(photos_data=data).first()
-                    photo_url[photo.id] = {'baseUrl': photo.photos_url,
-                                           'title': 'Empty title',
-                                           'description': '',
-                                           'location': 'Empty location',
-                                           'creationTime': ''}
+                    photo = Photo.query.filter_by(photos_data=data).first()
+                    photo_url.append({'baseUrl': photo.photos_url,
+                                      'title': 'Empty title',
+                                      'description': '',
+                                      'location': 'Empty location',
+                                      'creationTime': '',
+                                      'photo_id': photo.id})
 
         if dropbox_photos_urls:
             for url in dropbox_photos_urls:
-                photo_id = Photos.query.filter_by(photos_data=url).first()
+                photo_id = Photo.query.filter_by(photos_data=url).first()
                 photo_url[photo_id.id] = {'baseUrl': url,
                                           'description': 'Empty description',
                                           'creationTime': '0000-00-00'}
@@ -169,13 +189,14 @@ class DBHandler:
                     photo_data_dict = {}  # Dictionary to store photo data
 
                     for icloud_photo_id in icloud_photos_ids:
-                        photo_id = Photos.query.filter_by(photos_data=icloud_photo_id).first()
+                        photo_id = Photo.query.filter_by(photos_data=icloud_photo_id).first()
                         icloud_password = keyring.get_password("pyicloud", photo_id.apple_id)
 
                         if photo_id.apple_id not in photo_data_dict:
                             api = PyiCloudService(photo_id.apple_id, icloud_password)
-                            # api.authenticate(force_refresh=True)
-                            photo_data_dict[photo_id.apple_id] = {}  # Initialize a new inner dictionary for each apple_id
+                            api.authenticate(force_refresh=True)
+                            photo_data_dict[
+                                photo_id.apple_id] = {}  # Initialize a new inner dictionary for each apple_id
 
                             for photo in api.photos.albums['All Photos']:
                                 for version, data in photo.versions.items():
@@ -184,24 +205,28 @@ class DBHandler:
                                                                                         'creationTime': photo.created}
 
                     for icloud_photo_id in icloud_photos_ids:
-                        photo = Photos.query.filter_by(photos_data=icloud_photo_id).first()
+                        photo = Photo.query.filter_by(photos_data=icloud_photo_id).first()
 
-                        photo_meta_data = PhotosMetaData.query.filter_by(photo_id=photo.id).first()
+                        photo_meta_data = PhotoMetaData.query.filter_by(photo_id=photo.id).first()
                         if photo.apple_id in photo_data_dict:
                             apple_id_data = photo_data_dict[photo.apple_id]
                             for key, val in apple_id_data.items():
                                 if icloud_photo_id == key:
                                     photo.created_at = datetime.now()
                                     photo.photos_url = val['baseUrl']
-                                    photo_url[photo.id] = {'baseUrl': val['baseUrl'],
-                                                              'description': 'Empty description',
-                                                              'creationTime': str(val['creationTime']).split()[0]}
+                                    unix_time = int(
+                                        datetime.strptime(str(val['creationTime']).split()[0], '%Y-%m-%d').timestamp())
+
+                                    photo_url.append({'baseUrl': val['baseUrl'],
+                                                      'description': 'Empty description',
+                                                      'creationTime': unix_time,
+                                                      'photo_id': photo.id})
                                     if not photo_meta_data:
-                                        new_photo_meta_data = PhotosMetaData(title='Empty title',
-                                                                             description='Empty description',
-                                                                             location='Empty location',
-                                                                             creation_data=str(val['creationTime']).split()[0],
-                                                                             photo_id=photo.id)
+                                        new_photo_meta_data = PhotoMetaData(title='Empty title',
+                                                                            description='Empty description',
+                                                                            location='Empty location',
+                                                                            creation_data=unix_time,
+                                                                            photo_id=photo.id)
                                         db.session.add(new_photo_meta_data)
                         db.session.commit()
                 except PyiCloudFailedLoginException:
@@ -209,12 +234,13 @@ class DBHandler:
 
             if time_difference <= timedelta(hours=1):
                 for data in icloud_photos_ids:
-                    photo = Photos.query.filter_by(photos_data=data).first()
-                    photo_url[photo.id] = {'baseUrl': photo.photos_url,
-                                           'title': 'Empty title',
-                                           'description': '',
-                                           'location': 'Empty location',
-                                           'creationTime': ''}
+                    photo = Photo.query.filter_by(photos_data=data).first()
+                    photo_url.append({'baseUrl': photo.photos_url,
+                                      'title': 'Empty title',
+                                      'description': '',
+                                      'location': 'Empty location',
+                                      'creationTime': '',
+                                      'photo_id': photo.id})
 
         return photo_url
 

@@ -19,10 +19,10 @@
         <hr>
         {% for email, photo_data in photos.items() %}
             <h5 class="text-center">Photo upload by : {{ email }}</h5><br>
-            {% for id, dict_data in photo_data.items() %}
+            {% for dict_data in photo_data%}
                 {% if dict_data.baseUrl %}
                     <div class="photo-content text-center">
-                        <div class="content" data-toggle="modal" data-target="#modal-{{ id }}">
+                        <div class="content" data-toggle="modal" data-target="#modal-{{ dict_data.photo_id }}">
                             <img src="{{ dict_data.baseUrl }}" alt="Photo from {{ email }}" height="150px">
                                 <div class="photo_data bg-light">
                                {% if dict_data.title|length > 10 %}
@@ -37,9 +37,9 @@
                                 {% endif %}
                                 </div>
                         </div>
-                        {% if current_user.email == email or permissions.query.filter_by(photo_id=id).first()%}
+                        {% if current_user.email == email or permissions.query.filter_by(photo_id=dict_data.photo_id).first()%}
                             <label for="">
-                                <input type="checkbox" class="photo-checkbox" value="{{ id }}">
+                                <input type="checkbox" class="photo-checkbox" value="{{ dict_data.photo_id }}">
                                 Select Photo
                             </label>
                         {% endif %}
@@ -99,11 +99,11 @@
                             </div>
                         </form>
                     </div>
-                    <div class="modal fade" id="modal-{{ id }}" tabindex="-1" role="dialog" aria-labelledby="modalLabel-{{ photo_id }}" aria-hidden="true">
+                    <div class="modal fade" id="modal-{{ dict_data.photo_id }}" tabindex="-1" role="dialog" aria-labelledby="modalLabel-{{ photo_id }}" aria-hidden="true">
                         <div class="modal-dialog" role="document">
                             <div class="modal-content">
                                 <div class="modal-header">
-                                    <h5 class="modal-title" id="modalLabel-{{ id }}">Photo from {{ email }}</h5>
+                                    <h5 class="modal-title" id="modalLabel-{{ dict_data.photo_id }}">Photo from {{ email }}</h5>
                                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                                         <span aria-hidden="true">&times;</span>
                                     </button>
@@ -114,20 +114,24 @@
                                     <p>{{ dict_data.description }}</p>
                                     <p>{{ dict_data.location }}</p>
                                     <p>{{ dict_data.creation_data }}</p>
-                                    {% if current_user.email == email or permissions.query.filter_by(photo_id=id).first()  %}
-                                        <button class="update-button btn btn-primary" data-toggle="modal" data-dismiss="modal" data-target="#update-form-{{ id }}">Update</button>
+                                    {% if current_user.email == email or permissions.query.filter_by(photo_id=dict_data.photo_id).first()  %}
+                                        <button class="update-button btn btn-primary" data-toggle="modal" data-dismiss="modal" data-target="#update-form-{{ dict_data.photo_id }}">Update</button>
                                     {% endif %}
+                                    <div id="commento"></div>
+                                    <script defer
+                                      src="https://cdn.commento.io/js/commento.js">
+                                    </script>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {% if current_user.email == email or permissions.query.filter_by(photo_id=id).first()%}
-                        <div class="modal fade" id="update-form-{{ id }}" tabindex="-1" role="dialog" aria-labelledby="modalLabel-{{ id }}" aria-hidden="true" style="overflow-y: scroll">
+                    {% if current_user.email == email or permissions.query.filter_by(photo_id=dict_data.photo_id).first()%}
+                        <div class="modal fade" id="update-form-{{ dict_data.photo_id }}" tabindex="-1" role="dialog" aria-labelledby="modalLabel-{{ dict_data.photo_id }}" aria-hidden="true" style="overflow-y: scroll">
                             <div class="modal-dialog" role="document">
                                 <div class="modal-content">
                                     <div class="modal-header">
-                                        <h5 class="modal-title" id="modalLabel-{{ id }}">Photo Details</h5>
+                                        <h5 class="modal-title" id="modalLabel-{{ dict_data.photo_id }}">Photo Details</h5>
                                         <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                                             <span aria-hidden="true">&times;</span>
                                         </button>
@@ -135,7 +139,7 @@
                                     <div class="modal-body overflow-auto text-center">
                                         <img src="{{ dict_data.baseUrl }}" alt="Photo" height="300px">
                                         <form action="{{ url_for('photos.add_photo_description') }}" method="post">
-                                            <input type="hidden" name="photo_id" value="{{ id }}">
+                                            <input type="hidden" name="photo_id" value="{{ dict_data.photo_id}}">
                                             {% if form.csrf_token %}
                                                 {{ form.csrf_token }}
                                             {% endif %}
@@ -160,23 +164,23 @@
                                             {{ form.submit }}
 {#                                                    <input type="submit" class="btn" value="Phorever">#}
                                         </form>
-                                        <button class="update-button btn" data-toggle="modal" data-dismiss="modal" data-target="#permissions-form-{{ id }}">Invite for editing</button>
+                                        <button class="update-button btn" data-toggle="modal" data-dismiss="modal" data-target="#permissions-form-{{ dict_data.photo_id }}">Invite for editing</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="modal fade" id="permissions-form-{{ id }}" tabindex="-1" role="dialog" aria-labelledby="updateFormLabel-{{ id }}" aria-hidden="true">
+                        <div class="modal fade" id="permissions-form-{{ dict_data.photo_id }}" tabindex="-1" role="dialog" aria-labelledby="updateFormLabel-{{ dict_data.photo_id }}" aria-hidden="true">
                           <div class="modal-dialog" role="document">
                             <div class="modal-content">
                               <div class="modal-header">
-                                <h5 class="modal-title" id="updateFormLabel-{{ id }}">Allow Editing</h5>
+                                <h5 class="modal-title" id="updateFormLabel-{{ dict_data.photo_id }}">Allow Editing</h5>
                                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                                   <span aria-hidden="true">&times;</span>
                                 </button>
                               </div>
                               <form action="{{ url_for('photos.add_editing_permission') }}" method="post" class="my-4">
-                                <input type="hidden" name="photo_id" value="{{ id }}">
+                                <input type="hidden" name="photo_id" value="{{ dict_data.photo_id }}">
                                 <div class="modal-body">
                                   <div class="form-content">
                                     <div class="form-row">
@@ -186,7 +190,7 @@
                                         {% for family_user_email in family_users %}
                                           {% if family_user_email %}
                                             {% if current_user.email != family_user_email %}
-                                              {% if not permissions.query.filter_by(email=family_user_email, photo_id=id).first() and family_user_email != email%}
+                                              {% if not permissions.query.filter_by(email=family_user_email, photo_id=dict_data.photo_id).first() and family_user_email != email%}
                                                 <div class="form-check">
                                                   <input class="form-check-input" type="checkbox" id="email{{ loop.index }}" name="selected_users" value="{{ family_user_email }}">
                                                   <label class="form-check-label" for="email{{ loop.index }}">
@@ -210,11 +214,11 @@
                         </div>
 
                     {% else %}
-                        <div class="modal fade" id="modal-{{ id }}" tabindex="-1" role="dialog" aria-labelledby="modalLabel-{{ id }}" aria-hidden="true">
+                        <div class="modal fade" id="modal-{{ dict_data.photo_id }}" tabindex="-1" role="dialog" aria-labelledby="modalLabel-{{ id }}" aria-hidden="true">
                             <div class="modal-dialog" role="document">
                                 <div class="modal-content">
                                     <div class="modal-header">
-                                        <h5 class="modal-title" id="modalLabel-{{ id }}">Photo Details</h5>
+                                        <h5 class="modal-title" id="modalLabel-{{ dict_data.photo_id }}">Photo Details</h5>
                                         <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                                             <span aria-hidden="true">&times;</span>
                                         </button>

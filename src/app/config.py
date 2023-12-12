@@ -26,6 +26,7 @@ REVOKE_TOKEN = os.environ.get('REVOKE_TOKEN')
 GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY')
 BROKER_URI = os.environ.get('BROKER_URI')
 BASE = os.environ.get('BASE')
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 
 
 def generate_unique_code():

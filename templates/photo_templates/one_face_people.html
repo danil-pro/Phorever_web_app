@@ -35,69 +35,53 @@
                     </button>
                 </div>
                 <div class="modal-body overflow-auto text-center">
-                        {% for face_data in list_face_code %}
-                            {% for photo_id, data in face_data.items() %}
-                                {% if data[1] != face_code%}
-                                    <label style="display: inline-block; position: relative;">
-                                        <a href="#" data-toggle="modal" data-target="#photoModal{{ data[1] }}">
-                                            <img src="../../static/img/user_photos/faces/{{ data[0] }}/{{ data[1] }}.jpeg" height="150px" width="150px" alt=""><br>
-                                            <span style="word-wrap: break-word; position: absolute; bottom: 0; left: 0; background-color: rgba(0, 0, 0, 0.5); padding: 5px; font-size: 12px; width: 100%;; color: white; ;">{{ data[2] }}</span>
-                                        </a>
-                                    </label>
-                                    <div class="modal fade" id="photoModal{{ data[1] }}" tabindex="-1" role="dialog" aria-labelledby="photoModalLabel" aria-hidden="true">
-                                        <div class="modal-dialog" role="document">
-                                            <div class="modal-content">
-                                                <div class="modal-header">
-                                                    <h5 class="modal-title" id="photoModalLabel">Selected Photo:</h5>
-                                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                                        <span aria-hidden="true">&times;</span>
-                                                    </button>
-                                                </div>
-                                                    <div class="modal-body text-center">
-                                                        <form method="POST" action="{{ url_for('family_tree.family_tree_relationships') }}">
-                                                            <label style="display: inline-block; position: relative;">
-                                                                <img src="../../static/img/user_photos/faces/{{ data[0] }}/{{ data[1] }}.jpeg" class="" alt="" width="150px" height="150px">
-                                                                <span style="word-wrap: break-word; position: absolute; bottom: 0; left: 0; background-color: rgba(0, 0, 0, 0.5); padding: 5px; font-size: 12px; width: 100%;; color: white; ;">{{ data[2] }}</span>
-                                                                <input type="hidden" value="{{ data[1] }}" name="relative_person">
-                                                            </label>
-                                                            {{ add_family_member_form.relationship(class='relationship') }}
-                                                            <label style="display: inline-block; position: relative;">
-                                                                <img src="../../static/img/user_photos/faces/{{ face_path }}/{{ face_code }}.jpeg" class="" alt="" width="150px" height="150px">
-                                                                <span style="word-wrap: break-word; position: absolute; bottom: 0; left: 0; background-color: rgba(0, 0, 0, 0.5); padding: 5px; font-size: 12px; width: 100%;; color: white; ;">{{ name }}</span>
-                                                                <input type="hidden" value="{{ face_code }}" name="person">
-                                                            </label>
-                                                            <div class="additional-form"></div>
-                                                            {{ add_family_member_form.submit() }}
-                                                        </form>
-                                                    </div>
+                    {% for face_data in list_face_code %}
+                            {% if face_data['face_code'] != face_code%}
+                                <label style="display: inline-block; position: relative;">
+                                    <a href="#" data-toggle="modal" data-target="#photoModal{{ face_data['face_code'] }}">
+                                        <img src="{{ face_data['face_path'] }}" height="150px" width="150px" alt=""><br>
+                                        <span style="word-wrap: break-word; position: absolute; bottom: 0; left: 0; background-color: rgba(0, 0, 0, 0.5); padding: 5px; font-size: 12px; width: 100%;; color: white; ;">{{ face_data['person_name'] }}</span>
+                                    </a>
+                                </label>
+                                <div class="modal fade" id="photoModal{{ face_data['face_code'] }}" tabindex="-1" role="dialog" aria-labelledby="photoModalLabel" aria-hidden="true">
+                                    <div class="modal-dialog" role="document">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title" id="photoModalLabel">Selected Photo:</h5>
+                                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                    <span aria-hidden="true">&times;</span>
+                                                </button>
                                             </div>
+                                                <div class="modal-body text-center">
+                                                    <form method="POST" action="{{ url_for('family_tree.family_tree_relationships') }}">
+                                                        <label style="display: inline-block; position: relative;">
+                                                            <img src="{{ face_data['face_path'] }}" class="" alt="" width="150px" height="150px">
+                                                            <span style="word-wrap: break-word; position: absolute; bottom: 0; left: 0; background-color: rgba(0, 0, 0, 0.5); padding: 5px; font-size: 12px; width: 100%;; color: white; ;">{{ face_data['person_name'] }}</span>
+                                                            <input type="hidden" value="{{ face_data['face_code'] }}" name="relative_person">
+                                                        </label>
+                                                        {{ add_family_member_form.relationship(class='relationship') }}
+                                                        <label style="display: inline-block; position: relative;">
+                                                            <img src="../../static/img/user_photos/faces/{{ face_path }}/{{ face_code }}.jpeg" class="" alt="" width="150px" height="150px">
+                                                            <span style="word-wrap: break-word; position: absolute; bottom: 0; left: 0; background-color: rgba(0, 0, 0, 0.5); padding: 5px; font-size: 12px; width: 100%;; color: white; ;">{{ name }}</span>
+                                                            <input type="hidden" value="{{ face_code }}" name="person">
+                                                        </label>
+                                                        <div class="additional-form"></div>
+                                                        {{ add_family_member_form.submit() }}
+                                                    </form>
+                                                </div>
                                         </div>
                                     </div>
-                                {% endif %}
-                            {% endfor %}
+                                </div>
+                            {% endif %}
                         {% endfor %}
 {#                    </form>#}
                     </div>
                 </div>
             </div>
         </div>
-
-
-{#            <select name="selected_id" style="margin-right: 10px;">#}
-{#                {% for i in person %}#}
-{#                    <option value="{{ i.id }}">{{ i.name }}</option>#}
-{#                {% endfor %}#}
-{#            </select>#}
-{#            {{ add_family_member_form.relationship() }}#}
-{#            {{ add_family_member_form.submit() }}#}
-
-
-
-
-
     {% for face in faces %}
         <div>
-            {% for photo_id, metadata in face.items() %}
+            {% for metadata in face%}
                 <div class="photo-content text-center">
                     <div class="content">
                         <img src="{{ metadata.baseUrl }}" height="250px" alt="">

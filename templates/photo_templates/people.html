@@ -10,14 +10,12 @@
 {% endwith %}
     <div>
         {% for face_data in face_dir %}
-            {% for photo_id, data in face_data.items() %}
-                <a href="{{ url_for('people.one_face_people', face_code=data[1]) }}">
-                <label style="display: inline-block; position: relative;">
-                    <img src="../../static/img/user_photos/faces/{{ data[0] }}/{{ data[1] }}.jpeg" height="200px" width="200px" alt=""><br>
-                    <span style="word-wrap: break-word; position: absolute; bottom: 0; left: 0; background-color: rgba(0, 0, 0, 0.5); padding: 5px; font-size: 12px; width: 100%;; color: white; ;">{{ data[2] }}</span>
-                </label>
-                </a>
-            {% endfor %}
+            <a href="{{ url_for('people.one_face_people', face_code=face_data['face_code']) }}">
+            <label style="display: inline-block; position: relative;">
+                <img src="{{ face_data['face_path'] }}" height="200px" width="200px" alt=""><br>
+                <span style="word-wrap: break-word; position: absolute; bottom: 0; left: 0; background-color: rgba(0, 0, 0, 0.5); padding: 5px; font-size: 12px; width: 100%;; color: white; ;">{{ face_data['person_name'] }}</span>
+            </label>
+            </a>
         {% endfor %}
     </div>
 {% endblock %}

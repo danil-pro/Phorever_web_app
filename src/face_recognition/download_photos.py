@@ -14,7 +14,7 @@ from collections import Counter
 import re
 from pillow_heif import register_heif_opener
 
-from src.app.model import db, FaceEncode, Users, Photos
+from src.app.model import db, FaceEncode, User, Photo
 import keyring
 from pyicloud import PyiCloudService
 from pyicloud.exceptions import PyiCloudFailedLoginException
@@ -30,8 +30,9 @@ face_recognition_encode = FaceEncodeHandler()
 
 
 @shared_task(bind=True, base=AbortableTask)
-def download_photos(self, credentials, photo_ids, source_function, user_id):
+def download_photos(self, credentials, data, source_function, user_id):
     file_name = {}
+    api_current_user = User.query.filter_by(id=user_id).first()
     download_faces = os.path.join(os.path.dirname(__file__), '..', '..', 'static',
                                   'img', 'user_photos', 'faces', 'download_face')
 
@@ -41,16 +42,15 @@ def download_photos(self, credentials, photo_ids, source_function, user_id):
                         credentials=Credentials.from_authorized_user_info(credentials),
                         static_discovery=False)
 
-        for photo_data in photo_ids:
-            photo_id, photo_url = photo_data.split('|')
-            request = service.mediaItems().get(mediaItemId=photo_id).execute()
+        for i in data:
+            request = service.mediaItems().get(mediaItemId=i['photo_id']).execute()
             download_url = request['baseUrl'] + '=d'  # Add '=d' to download the full-size photo
             response = requests.get(download_url)
 
-            image_path = os.path.join(download_faces, f'{photo_id}.jpeg')
+            image_path = os.path.join(download_faces, f"{i['photo_id']}.jpeg")
 
             if response.status_code == 200:
-                file_name[photo_id] = f'{photo_id}.jpeg'
+                file_name[i['photo_id']] = f"{i['photo_id']}.jpeg"
                 with open(image_path,
                           'wb') as photo_file:
                     photo_file.write(response.content)
@@ -59,19 +59,18 @@ def download_photos(self, credentials, photo_ids, source_function, user_id):
                 rotate_image(image_path)
 
             else:
-                print('Error downloading the photo')
+                return {'message': 'Error downloading the photo'}
     if source_function == '/photos/icloud_photos':
-        icloud_password = keyring.get_password("pyicloud", credentials['apple_id'])
-        api = PyiCloudService(credentials['apple_id'], icloud_password)
+        icloud_password = keyring.get_password("pyicloud", api_current_user.apple_id)
+        api = PyiCloudService(api_current_user.apple_id, icloud_password)
         api.authenticate(force_refresh=True)
 
         for photo in api.photos.albums['All Photos']:
-            for photo_data in photo_ids:
-                photo_id, photo_url = photo_data.split('|')
-                if photo.id == photo_id:
-                    image_path = os.path.join(download_faces, f'{photo_id}.jpeg')
-
-                    file_name[photo_id] = f'{photo_id}.jpeg'
+            for i in data:
+                if photo.id == i['photo_id']:
+                    photo_id_processed = i['photo_id'].replace('/', '____')
+                    image_path = os.path.join(download_faces, f"{photo_id_processed}.jpeg")
+                    file_name[i['photo_id']] = f"{photo_id_processed}.jpeg"
                     download = photo.download()
                     with open(image_path, 'wb') as thumb_file:
                         thumb_file.write(download.raw.read())
@@ -80,90 +79,91 @@ def download_photos(self, credentials, photo_ids, source_function, user_id):
     return face_encode_handler(file_name, user_id, credentials)
 
 
-def face_encode_handler(photo_list, user_id, session):
+def face_encode_handler(photo_list, user_id, credentials):
     download_faces = os.path.join(os.path.dirname(__file__), '..', '..', 'static',
                                   'img', 'user_photos', 'faces', 'download_face')
 
-    try:
-        face_encode = {}
+    # try:
+    face_encode = {}
 
-        for photo_id, file_name in photo_list.items():
-            image_path = os.path.join(download_faces, file_name)
+    for photo_id, file_name in photo_list.items():
+        image_path = os.path.join(download_faces, file_name)
 
-            image_pil = Image.open(image_path)
-            width, height = image_pil.size
-            image = face_recognition.load_image_file(image_path)
-            face_locations = None
-            if width > 4000 or height > 5000:
-                face_locations = face_recognition.face_locations(image)
-            else:
-                face_locations = face_recognition.face_locations(image, model='cnn')
+        image_pil = Image.open(image_path)
+        width, height = image_pil.size
+        image = face_recognition.load_image_file(image_path)
+        face_locations = None
+        if width > 4000 or height > 5000:
+            face_locations = face_recognition.face_locations(image)
+        else:
+            face_locations = face_recognition.face_locations(image, model='cnn')
 
-            if len(face_locations) == 0:
-                face_locations = face_recognition.face_locations(image, number_of_times_to_upsample=2)
+        if len(face_locations) == 0:
+            face_locations = face_recognition.face_locations(image, number_of_times_to_upsample=2)
 
-            photo_face_encoding = face_recognition.face_encodings(image, face_locations, model='small')
+        photo_face_encoding = face_recognition.face_encodings(image, face_locations, model='small')
 
-            face_encodes = []
-            for one_face_encode in photo_face_encoding:
-                face_encode_xyz = np.array(one_face_encode)
-                face_encodes.append(pickle.dumps(face_encode_xyz))
+        face_encodes = []
+        for one_face_encode in photo_face_encoding:
+            face_encode_xyz = np.array(one_face_encode)
+            face_encodes.append(pickle.dumps(face_encode_xyz))
 
-            face_encode[photo_id] = face_encodes
+        face_encode[photo_id] = face_encodes
 
-            # os.remove(image_path)
+        # os.remove(image_path)
 
-        for photo_id, face_encode in face_encode.items():
-            photo = Photos.query.filter_by(photos_data=photo_id).first()
-            for faces in face_encode:
-                code = generate_unique_code()
-                face = FaceEncode(face_encode=faces,
-                                  photo_id=photo.id,
-                                  face_code=code,
-                                  key_face=None,
-                                  user_id=user_id)
-                db.session.add(face)
-        db.session.commit()
+    for photo_id, face_encode in face_encode.items():
+        photo = Photo.query.filter_by(photos_data=photo_id).first()
+        for faces in face_encode:
+            code = generate_unique_code()
+            face = FaceEncode(face_encode=faces,
+                              photo_id=photo.id,
+                              face_code=code,
+                              key_face=None,
+                              user_id=user_id)
+            db.session.add(face)
+    db.session.commit()
 
-        user = Users.query.filter_by(id=user_id).first()
-        current_user_family = Users.query.filter_by(parent_id=user.parent_id).all()
+    user = User.query.filter_by(id=user_id).first()
+    current_user_family = User.query.filter_by(parent_id=user.parent_id).all()
 
-        face_encode = []
-        for family_user in current_user_family:
-            people_face = FaceEncode.query.filter_by(user_id=family_user.id).all()
-            for face in people_face:
-                decoded_face = pickle.loads(face.face_encode)
-                face_encode.append({face.photo_id: [decoded_face, face.face_code]})
+    face_encode = []
+    for family_user in current_user_family:
+        people_face = FaceEncode.query.filter_by(user_id=family_user.id).all()
+        for face in people_face:
+            decoded_face = pickle.loads(face.face_encode)
+            face_encode.append({face.photo_id: [decoded_face, face.face_code]})
 
-        family_user_faces = []
-        x = []
-        existing_files = [file for root, dirs, files in os.walk(os.path.join(os.path.dirname(__file__), '..', '..',
-                                                                             'static',
-                                                                             'img',
-                                                                             'user_photos', 'faces')) for file in files]
-        family_face_recognition = face_recognition_encode.face_recognition_handler(face_encode)
-        for i in family_face_recognition:
-            for photo_id, photo_ids in i.items():
-                print(photo_ids)
-                photo = Photos.query.filter_by(id=photo_id).first()
-                face = FaceEncode.query.filter_by(face_code=photo_ids[0]).first()
-                if f'{photo_ids[0]}.jpeg' not in existing_files:
-                    if photo_id not in x:
-                        x.append(photo_id)
+    family_user_faces = []
+    x = []
+    existing_files = [file for root, dirs, files in os.walk(os.path.join(os.path.dirname(__file__), '..', '..',
+                                                                         'static',
+                                                                         'img',
+                                                                         'user_photos', 'faces')) for file in files]
+    family_face_recognition = face_recognition_encode.face_recognition_handler(face_encode)
+    for i in family_face_recognition:
+        for photo_id, photo_ids in i.items():
+            print(photo_ids)
 
-                        family_user_faces.append({photo.photos_data: [face.photo_id, photo_ids[0]]})
-        face_recognition_encode.download_face_photos(session, family_user_faces, user.parent_id)
-        for i in family_face_recognition:
-            for photo_id, photo_ids in i.items():
-                for del_photo_id in photo_ids[1]:
-                    del_photo = Photos.query.filter_by(id=del_photo_id).first()
-                    file_path = os.path.join(download_faces, f'{del_photo.photos_data}.jpeg')
+            photo = Photo.query.filter_by(id=photo_id).first()
+            face = FaceEncode.query.filter_by(face_code=photo_ids[0]).first()
+            if f'{photo_ids[0]}.jpeg' not in existing_files:
+                if photo_id not in x:
+                    x.append(photo_id)
 
-                    if os.path.exists(file_path):
-                        os.remove(file_path)
+                    family_user_faces.append({photo.photos_data: [face.photo_id, photo_ids[0]]})
+    face_recognition_encode.download_face_photos(credentials, family_user_faces, user.parent_id)
+    # for i in family_face_recognition:
+    #     for photo_id, photo_ids in i.items():
+    #         for del_photo_id in photo_ids[1]:
+    #             del_photo = Photo.query.filter_by(id=del_photo_id).first()
+    #             file_path = os.path.join(download_faces, f'{del_photo.photos_data}.jpeg')
+    #
+    #             if os.path.exists(file_path):
+    #                 os.remove(file_path)
 
-    except Exception as e:
-        print(e)
+    # except Exception as e:
+    #     print(e)
 
 
 def rotate_image(image_path):

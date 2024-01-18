@@ -1,12 +1,9 @@
-import json
-import os
-import pickle
 import time
 
 import flask
 from flask import *
-from src.auth.auth import current_user
-from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, JWTManager, get_current_user
+from src.auth.auth import current_user, send_email
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from google.oauth2.credentials import Credentials
 
@@ -15,32 +12,31 @@ import dropbox
 from dropbox import files, sharing
 
 # from src.app.config import *
-from src.app.model import db, Photo, User, PhotoMetaData, EditingPermission, FaceEncode, Person
+from src.app.model import db, Photo, User, PhotoMetaData, EditingPermission, FaceEncode, Person, Message
 from src.photos.DBHandler import DBHandler
 from src.face_recognition.download_photos import download_photos
-from src.oauth2.oauth2 import authenticator, google_authorize, check_credentials, icloud_api_authorize
-from src.app.Forms import UpdateForm, UpdateLocationForm, UpdateCreationDateForm, AddFaceName, AddFamilyMemberForm
-from src.app.config import BASE
+from src.oauth2.oauth2 import authenticator, google_authorize, check_credentials
+from src.app.Forms import UpdateForm, UpdateLocationForm, UpdateCreationDateForm, AddCommentForm
 from datetime import datetime
+from src.face_recognition.download_photos import face_encode_handler
 
 import asyncio
 
 import src.photos.Handler as Handler
+from celery.result import allow_join_result
+
 # import json
 from pyicloud import PyiCloudService
 import keyring
 from pyicloud.exceptions import (PyiCloudNoStoredPasswordAvailableException, PyiCloudFailedLoginException,
                                  PyiCloudServiceNotActivatedException)
 from flask_restful import Api, Resource, reqparse
+from celery import group, chord
 
 photos = Blueprint('photos', __name__, template_folder='../templates/photo_templates', static_folder='../static')
 
 db_handler = DBHandler()
 api = Api()
-
-
-def photos_init_app(app):
-    api.init_app(app)
 
 
 # handler = src.photos.Handler
@@ -87,43 +83,35 @@ def google_photos():
 @photos.route('/add_photo', methods=['GET', 'POST'])
 def add_photo():
     if current_user.is_authenticated:
+        download_tasks = []
         credentials = check_credentials()
         if request.method == 'POST':
             photos_data = request.form.getlist('selected_photos')
             if photos_data:
                 source_function = request.form.get('source_function')
-                result = []
-                data = []
                 for photo_data in photos_data:
                     photo_id, photo_url = photo_data.split('|')
-                    print(f'{photo_id}.jpeg')
-                    if source_function == '/photos/google_photos':
-                        photo = Photo(photos_data=photo_id,
-                                      photos_url=photo_url,
-                                      service=source_function,
-                                      token=current_user.google_token,
-                                      refresh_token=current_user.google_refresh_token,
-                                      apple_id=None,
-                                      user_id=current_user.id)
-                        db.session.add(photo)
-                    elif source_function == '/photos/icloud_photos':
-                        photo = Photo(photos_data=photo_id,
-                                      photos_url=photo_url,
-                                      service=source_function,
-                                      token=None,
-                                      refresh_token=None,
-                                      apple_id=current_user.apple_id,
-                                      user_id=current_user.id)
-                        db.session.add(photo)
-                    data.append({'photo_id': photo_id, 'photo_url': photo_url})
-                if source_function == '/photos/google_photos':
-                    download_photos.delay(credentials, data, source_function,
-                                          current_user.id)
-                elif source_function == '/photos/icloud_photos':
-                    download_photos.delay(credentials, data,
-                                          source_function, current_user.id)
+                    photo = Photo(photos_data=photo_id,
+                                  photos_url=photo_url,
+                                  service=source_function,
+                                  token=current_user.google_token
+                                  if source_function == '/photos/google_photos' else None,
+                                  refresh_token=current_user.google_refresh_token
+                                  if source_function == '/photos/google_photos' else None,
+                                  apple_id=None
+                                  if source_function == '/photos/google_photos' else current_user.apple_id,
+                                  user_id=current_user.id)
+                    db.session.add(photo)
+                    db.session.commit()
+                    download_tasks.append(download_photos.s(credentials, photo_id, source_function, current_user.id))
 
-                db.session.commit()
+            task_group = group(download_tasks)
+            callback = face_encode_handler.s(current_user.id)
+            chord(task_group)(callback)
+
+            # face_encode_handler(current_user.id, credentials)
+
+            # db.session.commit()
 
             return redirect(url_for('user_photos'))
     return redirect(url_for('auth.login'))
@@ -225,6 +213,63 @@ def icloud_photos():
         except PyiCloudServiceNotActivatedException:
             return redirect(url_for('oauth2.icloud_authorize'))
     return redirect(url_for('auth.login'))
+
+
+@photos.route('/<photo_id>')
+def one_photo(photo_id):
+    if current_user.is_authenticated:
+        form = UpdateForm(request.form)
+        comment_form = AddCommentForm(request.form)
+        photo = Photo.query.filter_by(id=photo_id).first()
+        user = User.query.filter_by(id=photo.user_id).first()
+        photo_meta_data = PhotoMetaData.query.filter_by(photo_id=photo_id).first()
+        face_encode = FaceEncode.query.filter_by(photo_id=photo_id).all()
+        current_user_family = User.query.filter_by(parent_id=current_user.parent_id).all()
+        family_users = []
+
+        for family_user in current_user_family:
+            family_users.append(family_user.email)
+        persons = []
+        for person in face_encode:
+            person_data = Person.query.filter_by(face_code=person.key_face).first()
+            if person_data:
+                face_url = (f"../../static/img/user_photos/faces/"
+                            f"{'/'.join([person.key_face[i:i + 2] for i in range(0, len(person.key_face), 2)])}"
+                            f"/{person.key_face}.jpeg")
+                person_name = person_data.name
+                person_face_code = person.key_face
+                persons.append({'face_url': face_url,
+                                'person_name': person_name,
+                                'person_face_code': person_face_code})
+        photo_data = {
+            'photo_id': photo_id,
+            'user': user.email,
+            'photo_url': photo.photos_url,
+            'title': photo_meta_data.title,
+            'description': photo_meta_data.description,
+            'location': photo_meta_data.location,
+            'creation_data': datetime.fromtimestamp(photo_meta_data.creation_data).date(),
+            'persons': persons
+
+        }
+        unique_sender_emails = []
+        if photo.user_id == user.id:
+            comments = Message.query.filter_by(photo_id=photo_id).all()
+            for comment in comments:
+                if comment.sender.email not in unique_sender_emails:
+                    unique_sender_emails.append(comment.sender.email)
+
+        else:
+            comments = Message.query.filter(
+                (Message.photo_id == photo_id) &
+                ((Message.sender_id == user.id) | (Message.recipient_id == user.id))
+            ).all()
+
+        return render_template('photo_templates/photo.html', photo_data=photo_data,
+                               permissions=EditingPermission, form=form, family_users=family_users,
+                               comment_form=comment_form, comments=comments, unique_sender_emails=unique_sender_emails)
+    else:
+        return redirect(url_for('auth.login'))
 
 
 @photos.route('/update_media_meta_data', methods=['GET', 'POST'])
@@ -329,6 +374,24 @@ def add_editing_permission():
                 user = User.query.filter_by(email=email).first()
                 permissions = EditingPermission(photo_id=photo_id, email=user.email, editable=True)
                 db.session.add(permissions)
+                send_email(email, 'Photo Editing Permission Granted',
+                           f'''
+Hello,
+
+We are writing to let you know that {current_user.email} has granted you permission to edit the photo.
+
+You can now edit the photo by visiting the following link:
+{url_for('photos.one_photo', photo_id=photo_id, _external=True)}
+
+Please respect the original intent and content of the photo, and adhere to our community guidelines when making edits.
+
+If you have any questions or encounter any issues, please do not hesitate to contact our support team.
+
+Happy editing!
+
+Best regards,
+Phorever
+                ''')
             db.session.commit()
         return redirect(url_for('user_photos'))
     else:
@@ -485,10 +548,10 @@ class UserPhoto(Resource):
             return {'google_uri': google_authorize(api_current_user.id)}
 
         photos_data = api_photos_data.parse_args()
+        download_tasks = []
 
         if photos_data:
             source_function = None
-            data = []
             for photo_data in photos_data['data']:
                 if 'googleusercontent.com' in photo_data['photo_url']:
                     source_function = '/photos/google_photos'
@@ -503,26 +566,20 @@ class UserPhoto(Resource):
                     photos_url = photo_data.get('photo_url', '')
                     if not photos_url:
                         raise ValueError('Empty photos_url')
-                    photo = None
-                    if source_function == '/photos/google_photos':
-                        photo = Photo(photos_data=photo_data['photo_id'],
-                                      photos_url=photo_data['photo_url'],
-                                      service=source_function,
-                                      token=api_current_user.google_token,
-                                      refresh_token=api_current_user.google_refresh_token,
-                                      apple_id=None,
-                                      user_id=api_current_user.id)
-                        db.session.add(photo)
-                    elif source_function == '/photos/icloud_photos':
-                        photo = Photo(photos_data=photo_data['photo_id'],
-                                      photos_url=photo_data['photo_url'],
-                                      service=source_function,
-                                      token=None,
-                                      refresh_token=None,
-                                      apple_id=api_current_user.apple_id,
-                                      user_id=api_current_user.id)
-                        db.session.add(photo)
+                    photo = Photo(photos_data=photo_data['photo_id'],
+                                  photos_url=photo_data['photo_url'],
+                                  service=source_function,
+                                  token=current_user.google_token
+                                  if source_function == '/photos/google_photos' else None,
+                                  refresh_token=current_user.google_refresh_token
+                                  if source_function == '/photos/google_photos' else None,
+                                  apple_id=None
+                                  if source_function == '/photos/google_photos' else current_user.apple_id,
+                                  user_id=current_user.id)
+                    db.session.add(photo)
                     db.session.commit()
+                    download_tasks.append(
+                        download_photos.s(credentials, photo_data['photo_id'], source_function, api_current_user.id))
 
                     title = photo_data.get('title', 'Empty title')
                     description = photo_data.get('description', 'Empty description')
@@ -537,7 +594,6 @@ class UserPhoto(Resource):
                                                    photo_id=photo.id)
 
                     db.session.add(photo_metadata)
-                    data.append({'photo_id': photo_data['photo_id'], 'photo_url': photo_data['photo_url']})
                 except ValueError as ve:
                     db.session.rollback()
                     return {'message': f'Invalid data format: {ve}'}, 400
@@ -547,10 +603,11 @@ class UserPhoto(Resource):
 
                 db.session.commit()
 
-            download_photos.delay(credentials, data, source_function,
-                                  api_current_user.id)
-
             db.session.commit()
+
+        task_group = group(download_tasks)
+        callback = face_encode_handler.s(current_user.id)
+        chord(task_group)(callback)
 
         return {'success': True, 'data': {'message': 'OK', 'code': 200}}, 200
 

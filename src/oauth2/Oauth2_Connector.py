@@ -10,12 +10,12 @@ from dropbox.exceptions import AuthError
 from dropbox import files, sharing
 from src.app.model import db, User
 
-import src.app.config
+import src
 import time
 
-config = src.app.config
+import src.app.config as config
 
-import sys
+
 # import datetime
 #
 # import httplib2

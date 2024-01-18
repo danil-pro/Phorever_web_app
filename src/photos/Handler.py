@@ -2,13 +2,11 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from google.auth.exceptions import RefreshError
 from flask import redirect, url_for
-from src.app.config import *
-import random
-import string
 # from src.app.model import Photos, FaceEncode, Person
 # from src.face_recognition.FaceEncodeHandler import FaceEncodeHandler
 from datetime import datetime
 from openai import OpenAI
+from src.app.config import *
 
 
 def photo_from_google(credentials, page_token=None, limit=100):

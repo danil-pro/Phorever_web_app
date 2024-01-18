@@ -7,35 +7,28 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from src.app.model import db, Photo, User, PhotoMetaData, FaceEncode, Person
 from src.photos.DBHandler import DBHandler
-from src.face_recognition.FaceEncodeHandler import FaceEncodeHandler
+from src.face_recognition.FaceEncodeHandler import download_face_photos, face_folders, face_recognition_handler
 from src.oauth2.oauth2 import check_credentials
 from src.app.Forms import AddFaceName, AddFamilyMemberForm
 from src.photos.Handler import openai_for_history
+from src.app.config import *
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_restful import Api, Resource, reqparse
 import datetime
-
-import json
 
 people_face = Blueprint('people', __name__, template_folder='../templates/photo_templates', static_folder='../static')
 
 db_handler = DBHandler()
 
-face_encode_handler = FaceEncodeHandler()
 
 api = Api()
-
-
-def face_recognition_init_app(app):
-    api.init_app(app)
 
 
 @people_face.route('/', methods=['GET', 'POST'])
 def people():
     if current_user.is_authenticated:
         # print(current_user.person.name)
-        faces_directory = os.path.join(os.path.dirname(__file__), '..', '..', 'static',
-                                       'img', 'user_photos', 'faces')
+
         current_user_family = User.query.filter_by(parent_id=current_user.parent_id).all()
         face_encode_data = (FaceEncode.query.join(Photo, FaceEncode.photo_id == Photo.id)
                             .join(User, Photo.user_id == User.id).filter(User.parent_id == current_user.parent_id).all())
@@ -47,8 +40,8 @@ def people():
                 decoded_face = pickle.loads(face.face_encode)
                 face_encode.append({face.photo_id: [decoded_face, face.face_code]})
 
-        list_face_code = face_encode_handler.face_folders(face_encode)
-        existing_files = [file for root, dirs, files in os.walk(faces_directory) for file in files]
+        list_face_code = face_folders(face_encode)
+        existing_files = [file for root, dirs, files in os.walk(faces_dir) for file in files]
         items_to_remove = []
         for data in list_face_code:
             person = Person.query.filter_by(face_code=data['face_code']).first()
@@ -93,9 +86,8 @@ def one_face_people(face_code):
             for face in people_face:
                 decoded_face = pickle.loads(face.face_encode)
                 face_encode.append({face.photo_id: [decoded_face, face.face_code]})
-        face_encode_handler = FaceEncodeHandler()
-        family_face_recognition = face_encode_handler.face_recognition_handler(face_encode)
-        list_face_code = face_encode_handler.face_folders(face_encode)
+        family_face_recognition = face_recognition_handler(face_encode)
+        list_face_code = face_folders(face_encode)
         for data in list_face_code:
             person_data = Person.query.filter_by(face_code=data['face_code']).first()
             if not person_data:
@@ -146,8 +138,6 @@ class Peoples(Resource):
     def get(self):
         api_current_user = User.query.filter_by(id=get_jwt_identity()).first()
 
-        faces_directory = os.path.join(os.path.dirname(__file__), '..', '..', 'static',
-                                       'img', 'user_photos', 'faces')
         current_user_family = User.query.filter_by(parent_id=api_current_user.parent_id).all()
         face_encode_data = (FaceEncode.query.join(Photo, FaceEncode.photo_id == Photo.id)
                             .join(User, Photo.user_id == User.id).filter(
@@ -159,8 +149,8 @@ class Peoples(Resource):
             for face in people_face:
                 decoded_face = pickle.loads(face.face_encode)
                 face_encode.append({face.photo_id: [decoded_face, face.face_code]})
-        list_face_code = face_encode_handler.face_folders(face_encode)
-        existing_files = [file for root, dirs, files in os.walk(faces_directory) for file in files]
+        list_face_code = face_folders(face_encode)
+        existing_files = [file for root, dirs, files in os.walk(faces_dir) for file in files]
         items_to_remove = []
         for data in list_face_code:
             person = Person.query.filter_by(face_code=data['face_code']).first()
@@ -211,8 +201,7 @@ class People(Resource):
             for face in people_face:
                 decoded_face = pickle.loads(face.face_encode)
                 face_encode.append({face.photo_id: [decoded_face, face.face_code]})
-        face_encode_handler = FaceEncodeHandler()
-        family_face_recognition = face_encode_handler.face_recognition_handler(face_encode)
+        family_face_recognition = face_recognition_handler(face_encode)
 
         current_person_photos = []
         for i in family_face_recognition:

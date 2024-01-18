@@ -1,0 +1,310 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+    <style>
+        .container {
+            display: flex;
+            flex-direction: column; /* Установка направления столбца для элементов в контейнере */
+            align-items: center; /* Центрирование элементов по горизонтали */
+            justify-content: center; /* Центрирование элементов по вертикали */
+            width: 100%; /* Ширина контейнера */
+            margin: auto; /* Автоматический внешний отступ для горизонтального центрирования */
+        }
+
+        .photo, .info {
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+
+        .info input, .info textarea {
+            display: block; /* Элементы будут занимать всю доступную ширину контейнера .info */
+        }
+
+        .photo-gallery {
+            display: inline-block;
+            flex-wrap: wrap; /* Перенос элементов на новую строку, если они не помещаются */
+            justify-content: center; /* Центрирование элементов внутри контейнера */
+            align-items: flex-start; /* Выравнивание элементов по верхнему краю */
+        }
+
+        .person-label {
+            display: inline-block;
+            margin: 10px; /* Отступы вокруг каждой фотографии */
+            position: relative;
+        }
+
+
+
+
+    </style>
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for msg in messages %}
+                <p>{{ msg }}</p>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+        <div class="container">
+            <div class="photo">
+                <img src="{{ photo_data['photo_url'] }}" alt="" height="300px">
+            </div>
+            {% if current_user.email == photo_data['user'] or permissions.query.filter_by(photo_id=photo_data['photo_id']).first()%}
+                <form action="{{ url_for('photos.add_photo_description') }}" method="post">
+                    <input type="hidden" name="photo_id" value="{{ photo_data['photo_id']}}">
+                    {% if form.csrf_token %}
+                        {{ form.csrf_token }}
+                    {% endif %}
+                    <div class="form-group">
+                        <label for="update-title">Title:</label>
+                        {{ form.title(value=photo_data['location']) }}
+                    </div>
+                    <div class="form-group">
+                        <label for="update-description">Description:</label>
+                        <textarea class="form-control" id="update-description" maxlength="10000" name="description" cols="30" rows="10">{{photo_data['description'] }}</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="update-location">Location:</label>
+                        {{ form.location(value=photo_data['location']) }}
+{#                                                        <input type="text" class="form-control" id="update-location" name="location" value="">#}
+                    </div>
+                    <div class="form-group">
+                        <label for="update-creation-date">Date:</label>
+                        {{ form.creation_date(value=photo_data['creation_data']) }}
+{#                                                        <input type="date" class="form-control" id="update-creation-date" name="creation_date" value="{{ data['creationTime'] }}">#}
+                    </div>
+                    {{ form.submit }}
+{#                                                    <input type="submit" class="btn" value="Phorever">#}
+                </form>
+                <button class="btn" data-toggle="modal" data-dismiss="modal" data-target="#permissions-form" style="margin-right: 152px; margin-top: 30px">Invite for editing</button>
+            {% else %}
+                <div class="info">
+                    <div class="form-group">
+                        <label for="update-title">Title:</label>
+                            <input type="text" id="exampleInputEmail1" class="form-control" readonly value="{{ photo_data['title'] }}"><br>
+                    </div>
+                    <div class="form-group">
+                        <label for="update-title">Description:</label>
+                            <textarea id="exampleInputEmail1" class="form-control" readonly>{{ photo_data['description'] }}</textarea><br>
+                    </div>
+                    <div class="form-group">
+                        <label for="update-title">Location:</label>
+                            <input type="text" id="exampleInputEmail1" class="form-control" readonly value="{{ photo_data['location'] }}"><br>
+                    </div>
+                    <div class="form-group">
+                        <label for="update-title">Date</label>
+                            <input type="date" id="exampleInputEmail1" class="form-control" readonly value="{{ photo_data['creation_data'] }}">
+                    </div>
+                </div>
+            {% endif %}
+            <div class="photo-gallery">
+                <h3 style="text-align: center">Persons on photo:</h3><br>
+                {% for i in photo_data["persons"] %}
+                    <label class="person-label">
+                        <a href="{{ url_for('people.one_face_people', face_code=i['person_face_code']) }}">
+                            <img src="{{ i['face_url'] }}" alt="" height="100px" >
+                            <span style="word-wrap: break-word; position: absolute; bottom: 0; left: 0; background-color: rgba(0, 0, 0, 0.5); padding: 5px; font-size: 12px; width: 100%;; color: white; ;">{{ i['person_name'] }}</span>
+                        </a>
+                    </label>
+                {% endfor %}
+            </div>
+            <hr>
+            <div>
+            {% if photo_data['user'] == current_user.email %}
+                <div class="comment">
+                    {% for sender in unique_sender_emails %}
+                            {% if sender != photo_data['user']%}
+                                <div>
+                                    <h6>{{ sender }}</h6>
+                                    <button class="btn" data-toggle="modal" data-target="#modal-comment-creator-{{ photo_data['photo_id'] }}">+</button>
+                                </div>
+
+                                <!-- Модальное окно -->
+                                <div class="modal fade" id="modal-comment-creator-{{ photo_data['photo_id'] }}" tabindex="-1" role="dialog" aria-labelledby="chatLabel_modal-comment-creator" aria-hidden="true">
+                                    <div class="modal-dialog" role="document">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title" id="modal-comment-creator-{{ photo_data['photo_id'] }}">Чат с {{ sender }}</h5>
+                                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                    <span aria-hidden="true">&times;</span>
+                                                </button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <div class="chat-box">
+                                                    {% for comment in comments %}
+                                                        <!-- Сообщения от отправителя -->
+                                                        {% if comment.sender.email == sender %}
+                                                            <div class="sender-message">
+                                                                <div class="message-content">{{ comment.content }}</div>
+                                                                <div class="message-timestamp">{{ comment.timestamp.strftime('%Y-%m-%d %H:%M') }}</div>
+                                                            </div>
+                                                        {% endif %}
+
+                                                        <!-- Ответы от владельца фотографии -->
+                                                        {% if comment.sender.email == photo_data['user'] and comment.recipient.email == sender %}
+                                                            <div class="owner-message">
+                                                                <div class="message-content">You</div>
+                                                                <hr>
+                                                                <div class="message-content">{{ comment.content }}</div>
+                                                                <div class="message-timestamp">{{ comment.timestamp.strftime('%Y-%m-%d %H:%M') }}</div>
+                                                            </div>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </div>
+
+
+                                                <div class="add_comment" style="text-align: center">
+                                                    <form action="{{ url_for('comment.post_comment', photo_id=photo_data['photo_id']) }}" method="post">
+                                                        <input type="hidden" name="recipient_user" value="{{ sender }}">
+                                                        <label for="">
+                                                            {{ comment_form.add_content(placeholder="Add comment") }}
+                                                        </label>
+                                                        <label for="">
+                                                            {{ comment_form.submit }}
+                                                        </label>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                    {% endfor %}
+                {% endif %}
+                </div>
+            <div class="comment">
+            {% if photo_data['user'] != current_user.email %}
+
+                <button class="btn" data-toggle="modal" data-target="#modal-comment">Comments</button>
+                {% for sender in unique_sender_emails %}
+                <div class="modal fade" id="modal-comment" tabindex="-1" role="dialog" aria-labelledby="chatLabel_modal-comment" aria-hidden="true">
+                    <div class="modal-dialog" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="chatLabel_modal-comment">Comments for {{ photo_data['user'] }}:</h5>
+                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                    <span aria-hidden="true">&times;</span>
+                                </button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="chat-box">
+                                    {% for comment in comments %}
+                                        {% if comment.sender.email == sender %}
+                                            <div class="sender-message">
+                                                <div class="message-content">You</div>
+                                                <hr>
+                                                <div class="message-content">{{ comment.content }}</div>
+                                                <div class="message-timestamp">{{ comment.timestamp.strftime('%Y-%m-%d %H:%M') }}</div>
+                                            </div>
+                                        {% elif comment.sender.email == photo_data['user'] and comment.recipient.email == sender %}
+                                            <div class="owner-message">
+                                                <div class="message-content">{{ comment.content }}</div>
+                                                <div class="message-timestamp">{{ comment.timestamp.strftime('%Y-%m-%d %H:%M') }}</div>
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+
+
+                                <div class="add_comment" style="text-align: center">
+{#                                    <input type="hidden" name="recipient_user" value="">#}
+                                    <form action="{{ url_for('comment.post_comment', photo_id=photo_data['photo_id']) }}" method="post">
+                                        <label for="">
+                                            {{ comment_form.add_content(placeholder="Add comment") }}
+                                        </label>
+                                        <label for="">
+                                            {{ comment_form.submit }}
+                                        </label>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% endif %}
+            </div>
+
+
+
+{#                    <form action="{{ url_for('comment.post_comment', photo_id=photo_data['photo_id']) }}" method="post">#}
+{#                        <label for="">#}
+{#                            {{ comment_form.add_content(value="Add comment") }}#}
+{#                        </label>#}
+{#                        <label for="">#}
+{#                            {{ comment_form.submit }}#}
+{#                        </label>#}
+{#                    </form>#}
+{#                {% endif %}#}
+                </div>
+            </div>
+
+
+
+        {% if current_user.email == photo_data['user'] or permissions.query.filter_by(photo_id=photo_data['photo_id']).first()%}
+
+            <div class="modal fade" id="permissions-form" tabindex="-1" role="dialog" aria-labelledby="updateFormLabel" aria-hidden="true">
+              <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                  <div class="modal-header">
+                    <h5 class="modal-title" id="updateFormLabel">Allow Editing</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                      <span aria-hidden="true">&times;</span>
+                    </button>
+                  </div>
+                  <form action="{{ url_for('photos.add_editing_permission') }}" method="post" class="my-4">
+                    <input type="hidden" name="photo_id" value="{{ photo_data['photo_id'] }}">
+                    <div class="modal-body">
+                      <div class="form-content">
+                        <div class="form-row">
+                          <div class="col">
+                            <h3 class="allow-editing-label">Invite for editing:</h3>
+                            <hr>
+                            {% for family_user_email in family_users %}
+                              {% if family_user_email %}
+                                {% if current_user.email != family_user_email %}
+                                  {% if not permissions.query.filter_by(email=family_user_email, photo_id=photo_data['photo_id']).first() and family_user_email != email%}
+                                    <div class="form-check">
+                                      <input class="form-check-input" type="checkbox" id="email{{ loop.index }}" name="selected_users" value="{{ family_user_email }}">
+                                      <label class="form-check-label" for="email{{ loop.index }}">
+                                        {{ family_user_email }}
+                                      </label>
+                                    </div>
+                                  {% endif %}
+                                {% endif %}
+                              {% endif %}
+                            {% endfor %}
+                          </div>
+                        </div>
+                        <div class="form-row">
+                          <button type="submit" class="btn btn-primary" style="margin-top: 10px">Allow</button>
+                        </div>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+
+        {% else %}
+            <div class="modal fade" id="modal" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
+                <div class="modal-dialog" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="modalLabel-{{ photo_data['photo_id'] }}">Photo Details</h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <img src="{{ photo_data['photo_url'] }}" alt="Photo" width="200px" height="200px">
+                            <h3>You don`t have a permission</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+
+
+{% endblock %}

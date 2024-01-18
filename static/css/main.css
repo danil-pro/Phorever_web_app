@@ -170,3 +170,48 @@ h1 {
     stroke-width: 3px;
 }
 
+.commento-logged-container {
+    display: none;
+}
+
+.commento-markdown-button {
+    display: none;
+}
+
+.commento-logo-text {
+    display: none;
+}
+
+.chat-box {
+    max-width: 600px;
+    margin: auto;
+    border: 1px solid #ddd;
+    padding: 20px;
+    height: 300px;
+    overflow-y: scroll;
+}
+
+.sender-message, .owner-message {
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 10px;
+}
+
+.sender-message {
+    background-color: #e9ecef;
+    text-align: left;
+}
+
+.owner-message {
+    background-color: #007bff;
+    color: white;
+    text-align: right;
+}
+
+.message-content {
+    margin-bottom: 5px;
+}
+
+.message-timestamp {
+    font-size: 0.8em;
+}

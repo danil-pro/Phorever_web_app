@@ -1,24 +1,21 @@
-import time
-
+import os
 import flask
 from flask import *
-from src.auth.auth import current_user
+from flask_login import current_user
+from src.app.config import *
 
 from google_auth_oauthlib.flow import Flow
 
-from src.app.config import *
 from src.oauth2.Oauth2_Connector import GoogleOauth2Connect, DropboxOauth2Connect
 from src.app.Forms import IcloudLoginForm, VerifyVerificationCodeForm, ICloudVerifyForm
 from src.app.model import User, db
 from flask_restful import Api, Resource, reqparse
 
-from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, JWTManager
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
 import keyring
 from pyicloud import PyiCloudService
 from pyicloud.exceptions import PyiCloudFailedLoginException
-from flask_caching import Cache
-
 
 oauth2 = Blueprint('oauth2', __name__, template_folder='../templates', static_folder='../static')
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -27,16 +24,13 @@ CLIENT_SECRETS_FILE = CLIENT_SECRETS_FILE
 absolute_path = os.path.join(current_dir, CLIENT_SECRETS_FILE)
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
+
 api = Api()
 SCOPES = [SCOPE1, SCOPE2, SCOPE3]
 API_SERVICE_NAME = API_SERVICE_NAME
 API_VERSION = API_VERSION
 GOOGLE_REDIRECT_URI = GOOGLE_REDIRECT_URI
 google_auth = GoogleOauth2Connect(CLIENT_SECRETS_FILE, SCOPES, API_SERVICE_NAME, API_VERSION)
-
-
-def oauth2_init_app(app):
-    api.init_app(app)
 
 
 authenticator = DropboxOauth2Connect(

@@ -27,6 +27,12 @@ GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY')
 BROKER_URI = os.environ.get('BROKER_URI')
 BASE = os.environ.get('BASE')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+HMAC_SECRET_KEY = os.environ.get('HMAC_SECRET_KEY')
+download_faces = os.path.join(os.path.dirname(__file__), '..', '..', 'static',
+                              'img', 'user_photos', 'faces', 'download_face')
+faces_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'static', 'img', 'user_photos', 'faces')
+user_photos_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'static',
+                               'img', 'user_photos')
 
 
 def generate_unique_code():

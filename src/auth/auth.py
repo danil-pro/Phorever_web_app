@@ -8,24 +8,20 @@ from flask_mail import Mail, Message
 import random
 import string
 from flask_restful import Api, Resource, reqparse
-from flask_httpauth import HTTPBasicAuth
-from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, JWTManager
+from flask_jwt_extended import create_access_token, JWTManager
+# from src.get_app import app
 
 auth = Blueprint('auth', __name__, template_folder='../templates/auth_templates', static_folder='../static')
+
 login_manager = LoginManager()
-http_auth = HTTPBasicAuth()
-jwt = JWTManager()
-# login_manager.login_view = "login"
+
 mail = Mail()
 api = Api()
 
 
-def init_app(app):
-    api.init_app(app)
-    login_manager.init_app(app)
-    jwt.init_app(app)
-    mail.init_app(app)
-    UserManager(app, db, User)
+# api.init_app(app)
+# login_manager.login_view = "auth.login"
+# UserManager(app, db, User)
 
 
 def send_email(email, message, body):

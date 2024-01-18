@@ -46,7 +46,8 @@ class UpdateForm(FlaskForm):
                                          'id': 'exampleInputEmail1',
                                          'aria-describedby': 'emailHelp'})
 
-    submit = SubmitField('Phorever', render_kw={'class': 'btn', 'style': ''})
+    submit = SubmitField('Phorever', render_kw={'class': 'btn',
+                                                'style': 'text-algin: center'})
 
 
 class UpdateLocationForm(FlaskForm):
@@ -125,3 +126,15 @@ class AddFamilyMemberForm(FlaskForm):
 
     ], render_kw={'class': 'form-select'})
     submit = SubmitField('Submit', render_kw={'class': 'btn', 'style': ''})
+
+
+class AddCommentForm(FlaskForm):
+    add_content = StringField('Add comment', validators=[DataRequired(), Length(min=1, max=50)],
+                          render_kw={'class': 'form-control',
+                                     'id': 'exampleInputEmail1',
+                                     'aria-label': 'Small',
+                                     'aria-describedby': 'inputGroup-sizing-sm',
+                                     'placeholder': 'Enter name'})
+
+    submit = SubmitField('Submit', render_kw={'class': 'btn', 'style': ''})
+

@@ -1,11 +1,7 @@
 from flask_sqlalchemy import SQLAlchemy
 from flask_user import UserMixin
 from datetime import datetime
-from passlib.apps import custom_app_context as pwd_context
-import jwt
-import time
 import keyring
-from src.auth.auth import current_user
 from flask import redirect, url_for
 from pyicloud import PyiCloudService
 
@@ -20,7 +16,8 @@ class User(db.Model, UserMixin):
     verification_token = db.Column(db.String(10), unique=True, nullable=True)
     parent_token = db.Column(db.String(10), nullable=True)
     state = db.Column(db.String(225), nullable=True)
-    parent_id = db.Column(db.Integer, nullable=True)
+    parent_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    family = db.relationship('User', backref=db.backref('parent', remote_side=[id]))
     apple_id = db.Column(db.String(225), nullable=True)
     google_token = db.Column(db.String(255), nullable=True)
     google_refresh_token = db.Column(db.String(255), nullable=True)
@@ -34,28 +31,6 @@ class User(db.Model, UserMixin):
 
     def is_authenticated(self):
         return hasattr(self, 'is_verified') and self.is_authenticated
-
-    def icloud_api(self, code=None):
-        from src.app.config import BASE
-        if not self.apple_id:
-            if not current_user:
-                return {'icloud_uri': f"{BASE}/api/v1/icloud/auth"}
-            else:
-                return redirect(url_for('oauth2.icloud_authorize'))
-        icloud_password = keyring.get_password("pyicloud", self.apple_id)
-        if not icloud_password:
-            return {'icloud_uri': f"{BASE}/api/v1/icloud/auth"}
-        api = PyiCloudService(self.apple_id, icloud_password)
-        api.authenticate(force_refresh=True)
-        if code:
-            result = api.validate_2fa_code(code)
-            if not result:
-                return {'message': 'Invalid verification code'}
-        else:
-            if api.requires_2fa:
-                return {'icloud_uri': f"{BASE}/api/v1/icloud/auth/verify_2fa"}
-
-        return api
 
 
 class PhotoMetaData(db.Model):
@@ -124,5 +99,27 @@ class UserPerson(db.Model):
     person_type = db.Column(db.String(50), nullable=False)
     degree = db.Column(db.String(50), nullable=True)
     line = db.Column(db.String(50), nullable=True)
+
+
+class Message(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    recipient_id = db.Column(db.Integer, db.ForeignKey('user.id'))  # Добавлено
+    content = db.Column(db.Text, nullable=False)
+    timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
+    photo_id = db.Column(db.Integer, db.ForeignKey('photo.id'))
+
+    photo = db.relationship('Photo', foreign_keys=[photo_id], backref='photo')
+    sender = db.relationship('User', foreign_keys=[sender_id], backref='sent_messages')
+    recipient = db.relationship('User', foreign_keys=[recipient_id], backref='received_messages')
+
+
+class UserMessage(db.Model):
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), primary_key=True)
+    message_id = db.Column(db.Integer, db.ForeignKey('message.id'), primary_key=True)
+
+    user = db.relationship('User', backref='user_messages')
+    message = db.relationship('Message', backref='user_messages')
+
 
 

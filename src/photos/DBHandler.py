@@ -2,23 +2,13 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
-from googleapiclient.errors import HttpError
 from datetime import datetime, timedelta
-from flask import redirect, url_for
-from PIL import Image
-import face_recognition
-import numpy as np
-from itertools import combinations
-import pickle
-from collections import Counter
-import re
 import itertools
 import keyring
 from pyicloud import PyiCloudService
 from pyicloud.exceptions import PyiCloudFailedLoginException
 
 import requests
-
 from src.app.config import *
 
 from src.app.model import Photo, db, PhotoMetaData

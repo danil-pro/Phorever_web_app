@@ -1,157 +1,138 @@
-import os
+import pickle
 import time
 
-from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
-from PIL import Image
-import face_recognition
-import numpy as np
-import pickle
-from pillow_heif import register_heif_opener
-from celery import Celery, chord
-from flask_login import current_user
-from src.app.config import *
-from src.app.model import db, FaceEncode, User, Photo
-import keyring
-from pyicloud import PyiCloudService
-from src.face_recognition.FaceEncodeHandler import download_face_photos, process_image, face_recognition_handler
-
 import requests
+from PIL import Image
+from celery import Celery, chord
+from celery import shared_task
+from pillow_heif import register_heif_opener
 from sqlalchemy.orm import joinedload
 
-from celery import shared_task
-from celery.result import allow_join_result
-from celery.contrib.abortable import AbortableTask
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import concurrent.futures
+from src.app.config import *
+from src.app.model import db, FaceEncode, User, Photo
+from src.app.utils import generate_unique_code
+from src.face_recognition.FaceEncodeHandler import download_face_photos, process_image, face_recognition_handler
+from src.photos.DBHandler import DBHandler
+
+db_handler = DBHandler()
 
 register_heif_opener()
 
 task = Celery('tasks', broker=BROKER_URI, backend='db+' + SQLALCHEMY_DATABASE_URI)
 
 
-@task.task(bind=True)
-def download_photos(self, credentials, data, source_function, user_id):
-    try:
-        face_encodes = {}
+@shared_task(bind=True)
+def download_photos(self, photo_url, photo_id, user_id):
+    db.engine.dispose()
+    from run import app
+    face_encodes = {}
+    image_path = os.path.join(download_faces, f"{photo_id}.jpeg")
 
-        image_path = os.path.join(download_faces, f"{data}.jpeg")
-        encode = None
+    encode = None
 
-        if source_function == '/photos/google_photos':
-            service = build(serviceName=API_SERVICE_NAME,
-                            version=API_VERSION,
-                            credentials=Credentials.from_authorized_user_info(credentials),
-                            static_discovery=False)
+    with app.app_context():
 
-            request = service.mediaItems().get(mediaItemId=data).execute()
-            download_url = request['baseUrl'] + '=d'  # Add '=d' to download the full-size photo
-            response = requests.get(download_url)
+        download_url = photo_url + '=d'  # Add '=d' to download the full-size photo
+        response = requests.get(download_url)
 
-            if response.status_code == 200:
-                with open(image_path,
-                          'wb') as photo_file:
-                    photo_file.write(response.content)
-                    photo_file.close()
+        if response.status_code == 200:
+            with open(image_path,
+                      'wb') as photo_file:
+                photo_file.write(response.content)
+                photo_file.close()
 
-                rotate_image(image_path)
-                encode, location = process_image(image_path)
-                face_encodes[data] = encode
-
+            rotate_image(image_path)
+            encode, location = process_image(image_path)
+            if encode and location:
+                face_encodes[photo_id] = encode
             else:
-                return {'message': 'Error downloading the photo'}
-        if source_function == '/photos/icloud_photos':
-            user = User.query.filter_by(id=user_id).first()
-            icloud_password = keyring.get_password("pyicloud", user.apple_id)
-            api = PyiCloudService(user.apple_id, icloud_password)
-            api.authenticate(force_refresh=True)
+                if os.path.exists(image_path):
+                    os.remove(image_path)
+                return {'message': 'not face'}
 
-            for photo in api.photos.albums['All Photos']:
-                if photo.id == data:
-                    photo_id_processed = data.replace('/', '____')
-                    image_path = os.path.join(download_faces, f"{photo_id_processed}.jpeg")
-                    download = photo.download()
-                    with open(image_path, 'wb') as thumb_file:
-                        thumb_file.write(download.raw.read())
-                        thumb_file.close()
-                    encode, location = process_image(image_path)
-                    face_encodes[data] = encode
+        else:
+            return {'message': 'Error downloading the photo'}
 
-        photo = Photo.query.filter_by(photos_data=data).first()
-        for faces in encode:
-            code = generate_unique_code()
-            face = FaceEncode(face_encode=faces,
-                              photo_id=photo.id,
-                              face_code=code,
-                              key_face=code,
-                              user_id=user_id)
-            db.session.add(face)
+    face_objects = []
+    for faces in encode:
+        # time.sleep(1)
+        code = generate_unique_code()
+        face = FaceEncode(
+            face_encode=faces,
+            photo_id=photo_id,
+            face_code=code,
+            key_face=code,
+            user_id=user_id
+        )
+        face_objects.append(face)
+
+    try:
+        # time.sleep(1)
+        db.session.bulk_save_objects(face_objects)
         db.session.commit()
     except Exception as e:
-        self.retry(exc=e, countdown=5)
+        print(e)
+        db.session.rollback()  # Важно для предотвращения блокировок в базе данных
+        raise  # Перевыброс для логгирования или дополнительной обработки ошибки
+    print('ok')
+    return {'message': 'not face'}
 
 
-@task.task()
-def face_encode_handler(result, user_id):
+@shared_task(bind=True)
+def face_encode_handler(x, y, user_id):
     user = User.query.filter_by(id=user_id).options(joinedload(User.family)).first()
     family_user_ids = [member.id for member in user.family]
 
-    # Получение всех FaceEncode для семьи пользователя
     people_faces = FaceEncode.query.filter(FaceEncode.user_id.in_(family_user_ids)).all()
 
-    # Создание списка кодировок лиц
-    # Получение существующих файлов
     existing_files = {file for root, dirs, files in os.walk(faces_dir) for file in files}
 
     face_encode = []
     for family_user in people_faces:
+        time.sleep(1)
         people_face = FaceEncode.query.filter_by(user_id=family_user.id).all()
         for face in people_face:
             decoded_face = pickle.loads(face.face_encode)
-            face_encode.append({face.photo_id: [decoded_face, face.face_code]})
+            face_encode.append({face.photo_id: [decoded_face, face.key_face]})
     family_face_recognition = face_recognition_handler(face_encode)
 
     for data in family_face_recognition:
         for key, val in data.items():
-            for i in val[1]:
-                if i is not key:
-                    faces = FaceEncode.query.filter_by(photo_id=i).all()
-
-                    for face in faces:
-                        key_face_check = FaceEncode.query.filter_by(key_face=face.face_code).all()
-                        if face.key_face == face.face_code and not key_face_check:
-                            face.key_face = val[0]
-                db.session.commit()
+            for face_data in val[1]:
+                for face, code in face_data.items():
+                    if code is not val[0]:
+                        new_face = FaceEncode.query.filter_by(face_code=code).first()
+                        new_face.key_face = val[0]
+                    db.session.commit()
 
     face_data_items = []
     x = []
     for i in family_face_recognition:
         for photo_id, photo_ids in i.items():
-
             photo = Photo.query.filter_by(id=photo_id).first()
             face = FaceEncode.query.filter_by(face_code=photo_ids[0]).first()
             if f'{photo_ids[0]}.jpeg' not in existing_files:
-                if photo.photos_data not in x:
-                    x.append(photo.photos_data)
+                if photo.photo_url not in x:
+                    x.append(photo.photo_url)
 
-                    face_data_items.append({photo.photos_data: [face.photo_id, photo_ids[0]]})
+                    face_data_items.append({photo.photo_url: [face.photo_id, photo_ids[0]]})
 
-    # download_face_photos.delay(face_data_items, user.parent_id)
     cleanup_callback = cleanup_files.s(family_face_recognition)
 
-    chord(download_face_photos.s(face_data_items, user.parent_id))(cleanup_callback)
+    chord(download_face_photos.s(face_data_items, user_id))(cleanup_callback)
 
 
 @task.task()
 def cleanup_files(result, family_face_recognition):
     for i in family_face_recognition:
-        for photo_id, photo_ids in i.items():
-            for del_photo_id in photo_ids[1]:
-                del_photo = Photo.query.filter_by(id=del_photo_id).first()
-                file_path = os.path.join(download_faces, f'{del_photo.photos_data}.jpeg')
+        for root_photo_id, face_data in i.items():
+            for face_dict in face_data[1]:
+                for photo_id, face_code in face_dict.items():
+                    file_path = os.path.join(download_faces, f'{photo_id}.jpeg')
 
-                if os.path.exists(file_path):
-                    os.remove(file_path)
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+
 
 def rotate_image(image_path):
     image = Image.open(image_path)

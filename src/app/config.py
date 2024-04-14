@@ -1,8 +1,5 @@
 import os
 from dotenv import load_dotenv, find_dotenv
-import random
-import string
-from src.app.model import FaceEncode
 
 load_dotenv(find_dotenv())
 
@@ -28,15 +25,10 @@ BROKER_URI = os.environ.get('BROKER_URI')
 BASE = os.environ.get('BASE')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 HMAC_SECRET_KEY = os.environ.get('HMAC_SECRET_KEY')
+FONTS = os.path.join(os.path.dirname(__file__), '..', '..', 'static',
+                     'fonts')
 download_faces = os.path.join(os.path.dirname(__file__), '..', '..', 'static',
                               'img', 'user_photos', 'faces', 'download_face')
 faces_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'static', 'img', 'user_photos', 'faces')
 user_photos_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'static',
                                'img', 'user_photos')
-
-
-def generate_unique_code():
-    while True:
-        code = ''.join(random.choices(string.ascii_letters + string.digits, k=6))
-        if not FaceEncode.query.filter_by(face_code=code).first():
-            return code

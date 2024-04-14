@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reply to Your Comment</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; color: #333; background-color: #f4f4f4; }
+        .container { max-width: 600px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
+        .header { text-align: center; padding-bottom: 20px; }
+        .content { line-height: 1.6; }
+        .button { display: inline-block; margin-top: 20px; padding: 10px 20px; color: #fff; background-color: #007bff; border-radius: 5px; text-decoration: none; }
+        .footer { margin-top: 20px; text-align: center; font-size: 0.8em; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>Reply to Your Comment</h2>
+        </div>
+        <div class="content">
+            <h2>Reply to Your Comment</h2>
+            <p>Hello,</p>
+            <p>{{ email }} has replied to your comment on the {{ item_type }}".</p>
+            <p>Reply: {{ content }}</p>
+            <p>You can view the reply and respond by visiting: <a href="{{ item_url }}">View {{ item_type | capitalize }}</a></p>
+            <p>Best regards,<br>Phorever Team</p>
+        </div>
+        <div class="footer">
+            <p>&copy; Phorever, All rights reserved.</p>
+        </div>
+    </div>

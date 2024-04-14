@@ -1,33 +1,30 @@
-from flask_user import UserManager
-from src.app.Forms import RegisterForm, LoginForm
-from flask_login import LoginManager, login_user, current_user, logout_user
-from werkzeug.security import generate_password_hash, check_password_hash
-from flask import *
-from src.app.model import db, User
-from flask_mail import Mail, Message
 import random
 import string
-from flask_restful import Api, Resource, reqparse
-from flask_jwt_extended import create_access_token, JWTManager
-# from src.get_app import app
+
+from flask import *
+from flask_jwt_extended import create_access_token
+from flask_login import LoginManager, login_user, current_user, logout_user
+from flask_mail import Mail
+from flask_restful import Api, Resource
+from marshmallow import ValidationError
+from werkzeug.security import generate_password_hash, check_password_hash
+
+from src.app.Forms import RegisterForm, LoginForm
+from src.app.model import db, User
+from src.app.utils import send_email
+from src.auth.UserAuth import UserSchema, LoginSchema
 
 auth = Blueprint('auth', __name__, template_folder='../templates/auth_templates', static_folder='../static')
 
 login_manager = LoginManager()
 
 mail = Mail()
+
 api = Api()
 
 
-# api.init_app(app)
-# login_manager.login_view = "auth.login"
-# UserManager(app, db, User)
-
-
-def send_email(email, message, body):
-    msg = Message(message, sender='phorever.cloud@gmail.com', recipients=[email])
-    msg.body = body
-    mail.send(msg)
+def auth_init_app(app):
+    api.init_app(app)
 
 
 @login_manager.user_loader
@@ -68,8 +65,8 @@ def register(parent_token=None):
         new_user.apple_id = None
         db.session.add(new_user)
         db.session.commit()
-        send_email(form.email.data, '', f'''Для подтверждения своей электронной почты, пожалуйста, посетите следующую ссылку:
-    {url_for('auth.verify_email', email=form.email.data, token=new_user.verification_token, _external=True)}
+        send_email(form.email.data, '', f'''Для подтверждения своей электронной почты, пожалуйста, посетите следующую 
+        ссылку: {url_for('auth.verify_email', email=form.email.data, token=new_user.verification_token, _external=True)}
     Если вы не запрашивали подтверждение своей электронной почты, то просто проигнорируйте это сообщение.
     ''')
         return render_template('auth_templates/verification.html')
@@ -83,21 +80,21 @@ def verify_email(email, token):
         verification_code = user.verification_token
         if token == verification_code:
             if user and user.is_verified:
-                flash('Ваша электронная почта уже была подтверждена.')
-                return redirect(url_for('index'))
+                flash('Your email has already been confirmed.')
+                return redirect(url_for('auth.login'))
             else:
                 user.is_verified = True
                 if user.parent_id is None:
                     user.parent_id = user.id
                 db.session.add(user)
                 db.session.commit()
-                flash('Ваша электронная почта была успешно подтверждена.')
+                flash('Your email has been successfully verified.')
                 return redirect(url_for('auth.login'))
         else:
             print('err')
-    except:
-        flash('Неверный токен верификации.')
-        return redirect(url_for('auth.verify_email'))
+    except Exception as e:
+        flash('Invalid verification token.')
+        return redirect(url_for('auth.login'))
     return redirect(url_for('auth.login'))
 
 
@@ -138,81 +135,41 @@ def profile():
         if request.method == 'POST':
             invite = request.form['invite']
             send_email(invite, f'Invite to Phorever from {current_user.email}',
-                       f"{url_for('auth.register', parent_token=current_user.parent_token,  _external=True)}")
+                       f"{url_for('auth.register', parent_token=current_user.parent_token, _external=True)}")
             flash('The invitation has been sent')
         return render_template('auth_templates/profile.html')
     else:
         return redirect(url_for('auth.login'))
 
 
-create_user = reqparse.RequestParser()
-create_user.add_argument("email", type=str, help="User email is required", required=True)
-create_user.add_argument("password", type=str, help="User password is required", required=True)
-create_user.add_argument("confirm_password", type=str, help="User password is required", required=True)
-create_user.add_argument("invite_token", type=str, help="User parent token")
-
-
-class SingUp(Resource):
+class SignUp(Resource):
     def post(self):
-        args = create_user.parse_args()
-        password = generate_password_hash(args.get('password'))
-        user = User.query.filter_by(email=args.get('email')).first()
-        if user:
-            return {'message': 'User exist'}, 409
-        if args.get('password') != args.get('confirm_password'):
-            return {'message': 'Password mismatch'}, 401
-        new_user = User(email=args.get('email'), password=password)
-        new_user.verification_token = str(random.randint(100000, 999999))
-        parent_token = args.get('invite_token')
-        if parent_token is None:
-            new_user.parent_id = None
-        else:
-            parent_user = User.query.filter_by(parent_token=parent_token).first()
-            if not parent_user:
-                return {'message': 'The user who invited does not exist'}, 404
-            if parent_user.parent_id:
-                new_user.parent_id = parent_user.parent_id
-            else:
-                new_user.parent_id = parent_user.id
-        new_user.parent_token = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
-        new_user.token = None
-        new_user.refresh_token = None
-        new_user.apple_id = None
-        db.session.add(new_user)
-        db.session.commit()
-        send_email(args.get('email'), '', f'''Для подтверждения своей электронной почты, пожалуйста, посетите следующую ссылку:
-        {url_for('auth.verify_email', email=args.get('email'), token=new_user.verification_token, _external=True)}
-        Если вы не запрашивали подтверждение своей электронной почты, то просто проигнорируйте это сообщение.
-        ''')
-        return {'success': True, 'data': {'user': new_user.email, 'code': 200, 'message': 'OK'}}, 200
+        user_schema = UserSchema()
+        try:
+            # Загрузка и валидация данных запроса
+            user = user_schema.load(request.json)
+        except ValidationError as err:
+            # Возвращение ошибки, если данные невалидны
+            return {"errors": err.messages}, 400
+
+        # Если данные валидны, user уже создан и сохранен в базе данных в post_load
+        return {'success': True, 'data': {'user': user.email, 'code': 200, 'message': 'OK'}}, 200
 
 
-user_login = reqparse.RequestParser()
-user_login.add_argument("email", type=str, help="User email is required", required=True)
-user_login.add_argument("password", type=str, help="User password is required", required=True)
+class SignIn(Resource):
+    def post(self):
+        login_schema = LoginSchema()
+        try:
+            # Загрузка и валидация данных запроса
+            user = login_schema.load(request.json)
+        except ValidationError as err:
+            # Возвращение ошибки, если данные невалидны
+            return {"errors": err.messages}, 400
+        access_token = create_access_token(identity=user.id)
+        # Если данные валидны, user уже создан и сохранен в базе данных в post_load
+        return {'success': True, 'data': {'user': user.email, 'access_token': access_token,
+                                          'code': 200, 'message': 'OK'}}, 200
 
 
-class SingIn(Resource):
-    def get(self):
-        args = user_login.parse_args()
-        email = args.get('email')
-        password = args.get('password')
-        user = load_user(email)
-        if not user:
-            return {'message': 'User not found'}, 404
-
-        if user and not user.is_verified:
-            return {'message': 'Email is not verified'}, 403
-
-        if user.password and check_password_hash(user.password, password):
-
-            access_token = create_access_token(identity=user.id)
-            return {'success': True, 'data': {'user': user.email, 'access_token': access_token,
-                                              'code': 200, 'message': 'OK'}}, 200
-        else:
-            return {'message': 'Incorrect email or password'}, 401
-
-
-api.add_resource(SingUp, '/api/v1/auth/sing_up')
-api.add_resource(SingIn, '/api/v1/auth/sing_in')
-
+api.add_resource(SignUp, '/api/v1/auth/sign_up')
+api.add_resource(SignIn, '/api/v1/auth/sign_in')

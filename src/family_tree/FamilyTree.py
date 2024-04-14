@@ -12,22 +12,25 @@ class FamilyTree:
             relative_name = Person.query.filter_by(id=relative_id).first()
             person_name = Person.query.filter_by(id=person_id).first()
 
-            tree[relative_id]['Relationships'].append({
+            tree[relative_id]['relationships'].append({
                 'name': person_name.name,
                 'id': person_id,
-                'relationship': person_type
+                'relationship': person_type,
+                "relation_id": rel.id
             })
 
-            tree[person_id]['Relationships'].append({
+            tree[person_id]['relationships'].append({
                 'name': relative_name.name,
                 'id': relative_id,
                 'relationship': relationship_type,
+                "relation_id": rel.id
             })
         self.add_inverse_relationships(tree, relationships)
         return tree
 
-    def add_relationship_if_not_exists(self, person_id, new_relationship, tree):
-        existing_relationships = tree[person_id]['Relationships']
+    @staticmethod
+    def add_relationship_if_not_exists(person_id, new_relationship, tree):
+        existing_relationships = tree[person_id]['relationships']
 
         # Проверка на существование такого отношения
         for rel in existing_relationships:
@@ -41,12 +44,12 @@ class FamilyTree:
         for person_id, person_data in tree.items():
             person_gender = person_data.get('gender')
 
-            for relationship in person_data['Relationships']:
+            for relationship in person_data['relationships']:
                 relative_id = relationship['id']
                 relationship_type = relationship['relationship']
 
                 if relationship_type in ['Father', 'Mother']:
-                    siblings = [rel for rel in tree[relative_id]['Relationships']
+                    siblings = [rel for rel in tree[relative_id]['relationships']
                                 if rel['relationship'] in ['Son', 'Daughter'] and rel['id'] != person_id]
 
                     for sibling in siblings:
@@ -62,7 +65,7 @@ class FamilyTree:
                         }, tree)
 
                 if relationship_type in ['Brother', 'Sister']:
-                    parents = [rel for rel in tree[relative_id]['Relationships'] if
+                    parents = [rel for rel in tree[relative_id]['relationships'] if
                                rel['relationship'] in ['Father', 'Mother']]
 
                     for parent in parents:
@@ -79,7 +82,8 @@ class FamilyTree:
 
         self.remove_invalid_sibling_relationships(tree, relationships)
 
-    def remove_invalid_sibling_relationships(self, tree, relationships):
+    @staticmethod
+    def remove_invalid_sibling_relationships(tree, relationships):
 
         for relationship in relationships:
             person_id = relationship.person_id
@@ -97,7 +101,7 @@ class FamilyTree:
             mother_id = None
             father_id = None
 
-            for rel in person.get('Relationships', []):
+            for rel in person.get('relationships', []):
                 if rel['relationship'] == 'Mother':
                     mother_id = rel['id']
                 elif rel['relationship'] == 'Father':
@@ -110,28 +114,28 @@ class FamilyTree:
             # Если line == 'Paternal', проверяем, не является ли mother родителем relative
 
             if line == 'Paternal' and mother_id:
-                if any(rel['id'] == mother_id for rel in relative.get('Relationships', [])):
-                    for i in tree[person_id]['Relationships']:
+                if any(rel['id'] == mother_id for rel in relative.get('relationships', [])):
+                    for i in tree[person_id]['relationships']:
                         if i['id'] == mother_id:
-                            tree[person_id]['Relationships'] = [
-                                rel for rel in tree[person_id]['Relationships'] if i != rel
+                            tree[person_id]['relationships'] = [
+                                rel for rel in tree[person_id]['relationships'] if i != rel
                             ]
-                    for i in tree[mother_id]['Relationships']:
+                    for i in tree[mother_id]['relationships']:
                         if i['id'] == person_id:
-                            tree[mother_id]['Relationships'] = [
-                                rel for rel in tree[mother_id]['Relationships'] if i != rel
+                            tree[mother_id]['relationships'] = [
+                                rel for rel in tree[mother_id]['relationships'] if i != rel
                             ]
 
             # Если line == 'Maternal', проверяем, не является ли father родителем relative
             elif line == 'Maternal' and father_id:
-                if any(rel['id'] == father_id for rel in relative.get('Relationships', [])):
-                    for i in tree[person_id]['Relationships']:
+                if any(rel['id'] == father_id for rel in relative.get('relationships', [])):
+                    for i in tree[person_id]['relationships']:
                         if i['id'] == father_id:
-                            tree[person_id]['Relationships'] = [
-                                rel for rel in tree[person_id]['Relationships'] if i != rel
+                            tree[person_id]['relationships'] = [
+                                rel for rel in tree[person_id]['relationships'] if i != rel
                             ]
-                    for i in tree[father_id]['Relationships']:
+                    for i in tree[father_id]['relationships']:
                         if i['id'] == person_id:
-                            tree[father_id]['Relationships'] = [
-                                rel for rel in tree[father_id]['Relationships'] if i != rel
+                            tree[father_id]['relationships'] = [
+                                rel for rel in tree[father_id]['relationships'] if i != rel
                             ]

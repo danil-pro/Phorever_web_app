@@ -1,13 +1,11 @@
 from flask import *
-from src.auth.auth import current_user
-
-from src.app.model import db, Photo, FaceEncode, Person, UserPerson, User
-
-from src.app.Forms import AddFamilyMemberForm
-
-from src.family_tree.FamilyTree import FamilyTree
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_restful import Api, Resource, reqparse
+
+from src.app.Forms import AddFamilyMemberForm
+from src.app.model import db, Photo, FaceEncode, Person, UserPerson, User, Permission
+from src.auth.auth import current_user
+from src.family_tree.FamilyTree import FamilyTree
 
 family_tree = Blueprint('family_tree', __name__,
                         template_folder='../templates/photo_templates', static_folder='../static')
@@ -61,7 +59,8 @@ def family_tree_relationships():
                 person_id=person.id,
                 person_type=person_type,
                 degree=degree,
-                line=line
+                line=line,
+                author_id=current_user.id
             )
             db.session.add(new_relationship)
 
@@ -82,7 +81,7 @@ def family_tree_relationships():
             if rel.person_id not in x:
                 x.append(rel.person_id)
 
-                tree[rel.person_id] = {'name': person_name, 'id': rel.person_id, 'Relationships': []}
+                tree[rel.person_id] = {'name': person_name, 'id': rel.person_id, 'relationships': []}
                 if 'gender' not in tree[rel.person_id]:
                     if rel.person_type in ['Sister', 'Daughter', 'Mother']:
                         tree[rel.person_id]['gender'] = 'F'
@@ -90,21 +89,23 @@ def family_tree_relationships():
                         tree[rel.person_id]['gender'] = 'M'
             if rel.relative_id not in x:
                 x.append(rel.relative_id)
-                tree[rel.relative_id] = {'name': relative_name, 'id': rel.relative_id, 'Relationships': []}
+                tree[rel.relative_id] = {'name': relative_name, 'id': rel.relative_id, 'relationships': []}
                 if 'gender' not in tree[rel.relative_id]:
                     if rel.relationship_type in ['Sister', 'Daughter', 'Mother']:
                         tree[rel.relative_id]['gender'] = 'F'
                     if rel.relationship_type in ['Brother', 'Son', 'Father']:
                         tree[rel.relative_id]['gender'] = 'M'
 
-        return render_template('photo_templates/photos_tree.html',
+        return render_template('photo_templates/../../templates/person_template/photos_tree.html',
                                family_tree=family_tree_add_relationships.add_relationship(tree, relationships))
     else:
         return redirect(url_for('auth.login'))
 
 
 relationships = reqparse.RequestParser()
+
 relationships.add_argument('relationship', type=str, required=True)
+relationships.add_argument('relationship_id', type=int, required=False)
 relationships.add_argument('relative_person', type=str, required=True)
 relationships.add_argument('person', type=str, required=True)
 relationships.add_argument('relationship_type', type=str, required=True)
@@ -132,7 +133,7 @@ class APIFamilyTree(Resource):
             if rel.person_id not in x:
                 x.append(rel.person_id)
 
-                tree[rel.person_id] = {'name': person_name, 'id': rel.person_id, 'Relationships': []}
+                tree[rel.person_id] = {'name': person_name, 'id': rel.person_id, 'relationships': []}
                 if 'gender' not in tree[rel.person_id]:
                     if rel.person_type in ['Sister', 'Daughter', 'Mother']:
                         tree[rel.person_id]['gender'] = 'F'
@@ -140,7 +141,8 @@ class APIFamilyTree(Resource):
                         tree[rel.person_id]['gender'] = 'M'
             if rel.relative_id not in x:
                 x.append(rel.relative_id)
-                tree[rel.relative_id] = {'name': relative_name, 'id': rel.relative_id, 'Relationships': []}
+                tree[rel.relative_id] = {'name': relative_name, 'id': rel.relative_id, 'relationships': []
+                                         }
                 if 'gender' not in tree[rel.relative_id]:
                     if rel.relationship_type in ['Sister', 'Daughter', 'Mother']:
                         tree[rel.relative_id]['gender'] = 'F'
@@ -152,6 +154,7 @@ class APIFamilyTree(Resource):
 
     @jwt_required()
     def post(self):
+        api_current_user = User.query.filter_by(id=get_jwt_identity()).first()
         args = relationships.parse_args()
         relative_person = Person.query.filter_by(face_code=args.get('relative_person')).first()
         relationship = args.get('relationship')
@@ -188,13 +191,69 @@ class APIFamilyTree(Resource):
             person_id=person.id,
             person_type=person_type,
             degree=degree,
-            line=line
+            line=line,
+            author_id=api_current_user.id
+
         )
+
         db.session.add(new_relationship)
 
         db.session.commit()
 
         return {'success': True, 'data': {'message': 'OK', 'code': 200}}, 200
+
+    @jwt_required()
+    def put(self):
+        api_current_user = User.query.filter_by(id=get_jwt_identity()).first()
+        args = relationships.parse_args()
+        relationship_id = args.get('relationship_id')
+        new_relationship_type = args.get('relationship_type')
+        new_person_type = args.get('person_type')
+        new_degree = args.get('degree', None)
+        new_line = args.get('line', None)
+
+        relationship = UserPerson.query.filter_by(id=relationship_id).first()
+
+        if not relationship:
+            return {'message': "Relationship not found"}, 404
+        elif relationship.author_id != api_current_user.id:
+
+            permission = Permission.query.filter_by(target='relation', target_id=relationship_id,
+                                                    email=api_current_user.email, editable=True).first()
+            if not permission:
+                return {'message': 'You do not have permission to edit this relation'}, 403
+
+        relationship.relationship_type = new_relationship_type
+        relationship.person_type = new_person_type
+        relationship.degree = new_degree
+        relationship.line = new_line
+
+        db.session.commit()
+
+        return {'success': True, 'data': {'message': 'Relationship updated successfully.', 'code': 200}}, 200
+
+    @jwt_required()
+    def delete(self):
+        api_current_user = User.query.filter_by(id=get_jwt_identity()).first()
+        args = relationships.parse_args()
+        relationship_id = args.get('relationship_id')
+
+        relationship = UserPerson.query.filter_by(id=relationship_id).first()
+
+        if not relationship:
+            return {'message': "Relationship not found"}, 404
+
+        elif relationship.author_id != api_current_user.id:
+
+            permission = Permission.query.filter_by(target='relation', target_id=relationship_id,
+                                                    email=api_current_user.email, editable=True).first()
+            if not permission:
+                return {'message': 'You do not have permission to edit this relation'}, 403
+
+        db.session.delete(relationship)
+        db.session.commit()
+
+        return {'success': True, 'data': {'message': 'Relationship deleted successfully.', 'code': 200}}, 200
 
 
 api.add_resource(APIFamilyTree, '/api/v1/family_tree')

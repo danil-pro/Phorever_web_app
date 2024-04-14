@@ -79,27 +79,25 @@
                 </div>
             </div>
         </div>
-    {% for face in faces %}
+    {% for photo in faces %}
         <div>
-            {% for metadata in face%}
-                <div class="photo-content text-center">
-                    <div class="content">
-                        <img src="{{ metadata.baseUrl }}" height="250px" alt="">
-                            <div class="photo_data bg-light">
-                               {% if metadata.title|length > 10 %}
-                                    <label>{{ metadata.title[:10] }}...</label><br>
-                                {% else %}
-                                    <label>{{ metadata.title }}</label><br>
-                                {% endif %}
-                                {% if metadata.description|length > 10 %}
-                                    <label>{{ metadata.description[:10] }}...</label><br>
-                                {% else %}
-                                    <label>{{ metadata.description }}</label><br>
-                                {% endif %}
-                            </div>
-                    </div>
+            <div class="photo-content text-center">
+                <div class="content">
+                    <img src="{{ photo.photo_url }}" height="250px" alt="">
+{#                        <div class="photo_data bg-light">#}
+{#                           {% if photo.meta_data.title|length > 10 %}#}
+{#                                <label>{{ photo.meta_data.title[:10] }}...</label><br>#}
+{#                            {% else %}#}
+{#                                <label>{{ photo.meta_data.title }}</label><br>#}
+{#                            {% endif %}#}
+{#                            {% if photo.meta_data.description|length > 10 %}#}
+{#                                <label>{{ photo.meta_data.description[:10] }}...</label><br>#}
+{#                            {% else %}#}
+{#                                <label>{{ photo.meta_data.description }}</label><br>#}
+{#                            {% endif %}#}
+{#                        </div>#}
                 </div>
-            {% endfor %}
+            </div>
         </div>
     {% endfor %}
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>

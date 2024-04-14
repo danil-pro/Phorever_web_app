@@ -1,0 +1,20 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for msg in messages %}
+                <p>{{ msg }}</p>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    <div style="display: inline-block">
+        <audio src="../../static/img/user_photos/faces/{{ sound }}" controls></audio>
+        {% for i in bio %}
+            <p>{{ i['text_content'] }}</p>
+            {% if i['photo_url'] %}
+                <img src="{{ i['photo_url'] }}" alt="" height="300px">
+            {% endif %}
+        {% endfor %}
+    </div>
+{% endblock %}

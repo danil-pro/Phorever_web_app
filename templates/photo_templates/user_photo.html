@@ -13,35 +13,32 @@
         <h3 class="text-center">Select more photos from services:</h3><br>
         <div class="d-flex justify-content-center">
             <a class="ml-3" href="{{ url_for('photos.google_photos') }}"> <h5>Google Photo </h5></a>
-            <a class="ml-3" href="{{ url_for('photos.dropbox_photos') }}"> <h5>Dropbox </h5></a>
-            <a class="ml-3" href="{{ url_for('photos.icloud_photos') }}"> <h5>Icloud </h5></a>
         </div>
         <hr>
-        {% for email, photo_data in photos.items() %}
+        {% for photo_data in photos %}
             <h5 class="text-center">Photo upload by : {{ email }}</h5><br>
-            {% for dict_data in photo_data%}
-                {% if dict_data.baseUrl %}
+                {% if photo_data['baseUrl'] %}
                     <div class="photo-content text-center">
                         <div class="content">
-                            <a href="{{ url_for('photos.one_photo', photo_id=dict_data.photo_id) }}">
-                            <img src="{{ dict_data.baseUrl }}" alt="Photo from {{ email }}" height="150px">
+                            <a href="{{ url_for('photos.one_photo', photo_id=photo_data['photo_id']) }}">
+                            <img src="{{ photo_data['baseUrl'] }}" alt="Photo from {{ email }}" height="150px">
                                 <div class="photo_data bg-light">
-                               {% if dict_data.title|length > 10 %}
-                                    <label>{{ dict_data.title[:10] }}...</label><br>
+                               {% if photo_data['title']|length > 10 %}
+                                    <label>{{ photo_data['title'][:10] }}...</label><br>
                                 {% else %}
-                                    <label>{{ dict_data.title }}</label><br>
+                                    <label>{{ photo_data['title'] }}</label><br>
                                 {% endif %}
-                                {% if dict_data.description|length > 10 %}
-                                    <label>{{ dict_data.description[:10] }}...</label><br>
+                                {% if photo_data['description']|length > 10 %}
+                                    <label>{{ photo_data['description'][:10] }}...</label><br>
                                 {% else %}
-                                    <label>{{ dict_data.description }}</label><br>
+                                    <label>{{ photo_data['description'] }}</label><br>
                                 {% endif %}
                                 </div>
                             </a>
                         </div>
-                        {% if current_user.email == email or permissions.query.filter_by(photo_id=dict_data.photo_id).first()%}
+                        {% if current_user.email == email or permissions.query.filter_by(target_id=photo_data['photo_id']).first()%}
                             <label for="">
-                                <input type="checkbox" class="photo-checkbox" value="{{ dict_data.photo_id }}">
+                                <input type="checkbox" class="photo-checkbox" value="{{ photo_data['photo_id'] }}">
                                 Select Photo
                             </label>
                         {% endif %}
@@ -103,14 +100,11 @@
                     </div>
         {% endif %}
         {% endfor %}
-        {% endfor %}
         <hr>
     {% else %}
         <h3 class="text-center">Select more photos from services:</h3><br>
         <div class="d-flex justify-content-center">
             <a class="ml-3" href="{{ url_for('photos.google_photos') }}"> <h5>Google Photo </h5></a>
-            <a class="ml-3" href="{{ url_for('photos.dropbox_photos') }}"> <h5>Dropbox </h5></a>
-            <a class="ml-3" href="{{ url_for('photos.icloud_photos') }}"> <h5>Icloud </h5></a>
         </div>
     {% endif %}
 {% endblock %}

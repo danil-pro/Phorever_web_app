@@ -4,19 +4,22 @@ from flask_login import LoginManager
 from flask_user import UserManager
 from flask_mail import Mail
 from flask_restful import Api
-import os
+from flask_jwt_extended import JWTManager
+from src.app.model import db, User
+
+
 def create_app():
     from src.app.config import (os, SECRET_KEY,
                                 SQLALCHEMY_DATABASE_URI, STMP_SERVER, STMP_PORT, STMP_USERNAME,
                                 STMP_PASSWORD, BROKER_URI)
-    from src.auth.auth import auth
+    from src.auth.auth import auth, auth_init_app
     from src.oauth2.oauth2 import oauth2
-    from src.photos.photo_handler import photos
-    from src.family_tree.family_tree import family_tree
-    from src.face_recognition.people_face_recognition import people_face
-    from src.photos.comment import comment
-    from src.app.model import db, User
+    from src.photos.photo_handler import photos, photo_init_app
+    from src.family_tree.family_tree import family_tree, family_tree_init_app
+    from src.face_recognition.people_face_recognition import people_face, people_init_app
+    from src.comments.comment import comment, comment_init_app
     from src.app.init_celery import make_celery
+    from src.permissions.permission import permission_init_app
 
     app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), '', '..', 'templates'),
                 static_folder=os.path.join(os.path.dirname(__file__), '', '..', 'static'))
@@ -69,7 +72,13 @@ def create_app():
 
     LoginManager(app)
     UserManager(app, db, User)
-    mail = Mail(app)
-    api = Api(app)
-
+    Mail(app)
+    Api(app)
+    family_tree_init_app(app)
+    auth_init_app(app)
+    people_init_app(app)
+    comment_init_app(app)
+    photo_init_app(app)
+    permission_init_app(app)
+    JWTManager(app)
     return app, celery

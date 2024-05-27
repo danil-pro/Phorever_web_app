@@ -8,13 +8,12 @@ import google.oauth2.credentials
 from src.photos.DBHandler import DBHandler
 from src.app.model import Photo, PhotoMetaData, Permission, User
 from src.app.config import *
-from run import app
 
 
 db_handler = DBHandler()
 
 
-@app.route('/')
+@current_app.route('/')
 def user_photos():
     if current_user.is_authenticated:
         credentials = check_credentials()
@@ -57,40 +56,40 @@ def user_photos():
 #     return render_template('googleb3f997e5d55f0443.html')
 
 
-@app.route('/privacy')
-def privacy():
-    return redirect('https://phorever.cloud/privacy')
-
-
-@app.route('/eula')
-def eula():
-    return redirect('https://phorever.cloud/eula')
-
-
-@app.route('/robot.txt')
-def static_from_root():
-    return send_from_directory(app.static_folder, 'robot.txt')
-
-
-# @app.route('/revoke')
-# def revoke():
-#     if 'credentials' not in session:
-#         return ('You need to <a href="/authorize">authorize</a> before ' +
-#                 'testing the code to revoke credentials')
-#     credentials = google.oauth2.credentials.Credentials(
-#         **session['credentials'])
+# @current_app.route('/privacy')
+# def privacy():
+#     return redirect('https://phorever.cloud/privacy')
 #
-#     revoke = requests.post(REVOKE_TOKEN,
-#                            params={'token': credentials.token},
-#                            headers={'content-type': 'application/x-www-form-urlencoded'})
 #
-#     status_code = getattr(revoke, 'status_code')
-#     if status_code == 200:
-#         return 'Credentials successfully revoked.'
-#     else:
-#         return 'An error occurred.' + str(status_code) + str(session['credentials'])
-
-
-# @app.route('/test')
-# def test():
-#     return render_template('photo_templates/../templates/person_template/bio.html')
+# @current_app.route('/eula')
+# def eula():
+#     return redirect('https://phorever.cloud/eula')
+#
+#
+# @current_app.route('/robot.txt')
+# def static_from_root():
+#     return send_from_directory(current_app.static_folder, 'robot.txt')
+#
+#
+# # @app.route('/revoke')
+# # def revoke():
+# #     if 'credentials' not in session:
+# #         return ('You need to <a href="/authorize">authorize</a> before ' +
+# #                 'testing the code to revoke credentials')
+# #     credentials = google.oauth2.credentials.Credentials(
+# #         **session['credentials'])
+# #
+# #     revoke = requests.post(REVOKE_TOKEN,
+# #                            params={'token': credentials.token},
+# #                            headers={'content-type': 'application/x-www-form-urlencoded'})
+# #
+# #     status_code = getattr(revoke, 'status_code')
+# #     if status_code == 200:
+# #         return 'Credentials successfully revoked.'
+# #     else:
+# #         return 'An error occurred.' + str(status_code) + str(session['credentials'])
+#
+#
+# # @app.route('/test')
+# # def test():
+# #     return render_template('photo_templates/../templates/person_template/bio.html')

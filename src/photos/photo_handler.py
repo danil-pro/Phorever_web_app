@@ -39,10 +39,6 @@ def photo_init_app(app):
     api.init_app(app)
 
 
-# handler = src.photos.Handler
-# family_tree_relationships = FamilyTree()
-
-
 @photos.route('/google_photos', methods=['GET', 'POST'])
 def google_photos():
     if current_user.is_authenticated:
@@ -409,7 +405,10 @@ Phorever
 
 def get_google_photos(next_page_token=None, limit=100):
     api_current_user = User.query.filter_by(id=get_jwt_identity()).first()
+    if api_current_user.google_credentials_create_at is None:
+        return {'google_uri': google_authorize(api_current_user.id)}
     time_difference = time.time() - api_current_user.google_credentials_create_at
+
     if time_difference >= 24 * 60 * 60:
         return {'google_uri': google_authorize(api_current_user.id)}
     credentials = check_credentials(api_current_user.id, 'google')
@@ -497,8 +496,9 @@ class UserPhoto(Resource):
     def get(self):
         user_id = get_jwt_identity()
         args = service_data.parse_args()
-
-        get_google_photos(args.get('next_page_token'), args.get('limit'))
+        if args.get('service') == 'google':
+            return get_google_photos(args.get('next_page_token') if args.get('next_page_token') else None,
+                                     args.get('limit'))
 
         return self.get_family_photos(user_id, args.get('limit'))
 
@@ -582,7 +582,7 @@ class UserPhoto(Resource):
             db.session.commit()
 
         task_group = group(download_tasks)
-        callback = face_encode_handler.s(current_user.id)
+        callback = face_encode_handler.s(user.id)
         chord(task_group)(callback)
 
         return {'success': True, 'data': {'message': 'OK', 'code': 200}}, 200
@@ -592,11 +592,17 @@ class UserPhoto(Resource):
         photos_data = []
         try:
             service = build(API_SERVICE_NAME, API_VERSION, credentials=credentials, static_discovery=False)
-            results = service.mediaItems().list(
-                pageSize=limit,
-                pageToken=page_token,
-                # fields='nextPageToken,mediaItems(id,baseUrl,mediaMetadata)',
-            ).execute()
+            if page_token:
+                results = service.mediaItems().list(
+                    pageSize=limit,
+                    pageToken=page_token,
+                    # fields='nextPageToken,mediaItems(id,baseUrl,mediaMetadata)',
+                ).execute()
+            else:
+                results = service.mediaItems().list(
+                    pageSize=limit
+                    # fields='nextPageToken,mediaItems(id,baseUrl,mediaMetadata)',
+                ).execute()
             items = results.get('mediaItems', [])
             for item in items:
                 media_meta_data = item.get('mediaMetadata')

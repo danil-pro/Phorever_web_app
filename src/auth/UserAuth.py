@@ -6,7 +6,6 @@ from flask import render_template, url_for
 from src.app.utils import send_email
 
 
-
 class UserSchema(Schema):
     email = fields.Email(required=True, error_messages={"required": "User email is required"})
     password = fields.Str(required=True, validate=validate.Length(min=8), error_messages={"required": "User password "

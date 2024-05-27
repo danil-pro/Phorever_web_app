@@ -11,9 +11,9 @@ from src.photos.DBHandler import DBHandler
 
 oauth2 = Blueprint('oauth2', __name__, template_folder='../templates', static_folder='../static')
 current_dir = os.path.dirname(os.path.abspath(__file__))
-CLIENT_SECRETS_FILE = CLIENT_SECRETS_FILE
 
-absolute_path = os.path.join(current_dir, CLIENT_SECRETS_FILE)
+absolute_path = os.path.abspath(CLIENT_SECRETS_FILE)
+print(absolute_path)
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
 

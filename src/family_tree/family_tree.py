@@ -124,6 +124,8 @@ class APIFamilyTree(Resource):
         person_ids = [person.id for person in persons]
         relationships = UserPerson.query.filter(UserPerson.person_id.in_(person_ids)).all()
 
+
+
         id_to_name = {person.id: person.name if person.name else "not name" for person in persons}
 
         x = []
@@ -156,9 +158,14 @@ class APIFamilyTree(Resource):
     def post(self):
         api_current_user = User.query.filter_by(id=get_jwt_identity()).first()
         args = relationships.parse_args()
-        relative_person = Person.query.filter_by(face_code=args.get('relative_person')).first()
+        relative_person = Person.query.filter_by(face_code=args.get('relative_person'),
+                                                 parent_id=api_current_user.parent_id).first()
         relationship = args.get('relationship')
-        person = Person.query.filter_by(face_code=args.get('person')).first()
+        person = Person.query.filter_by(face_code=args.get('person'),
+                                        parent_id=api_current_user.parent_id).first()
+        if not relative_person or person:
+            return {'message': 'persons not found or access denied'}, 400
+
         relationship_type = args.get('relationship_type')
         person_type = args.get('person_type')
         degree = None
@@ -167,6 +174,8 @@ class APIFamilyTree(Resource):
             degree = args.get('degree')
             if degree != 'Full':
                 line = args.get('line')
+
+
 
         # Проверка на уникальность отношения
         existing_relationship = UserPerson.query.filter(

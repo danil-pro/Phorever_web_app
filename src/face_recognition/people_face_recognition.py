@@ -14,6 +14,7 @@ from src.auth.auth import current_user
 from src.face_recognition.FaceEncodeHandler import face_folders
 from src.oauth2.oauth2 import check_credentials
 from src.photos.DBHandler import DBHandler
+from src.app.utils import family_access_required, get_user_by_id
 from openai import OpenAI
 from gtts import gTTS
 from mutagen.mp3 import MP3
@@ -145,11 +146,11 @@ class Peoples(Resource):
     @jwt_required()
     def get(self):
         api_current_user = User.query.filter_by(id=get_jwt_identity()).first()
-
         current_user_family = User.query.filter_by(parent_id=api_current_user.parent_id).all()
         face_encode_data = (FaceEncode.query.join(Photo, FaceEncode.photo_id == Photo.id)
                             .join(User, Photo.user_id == User.id).filter(
             User.parent_id == api_current_user.parent_id).all())
+
 
         face_encode = []
         for family_user in current_user_family:
@@ -173,7 +174,7 @@ class Peoples(Resource):
                              'birth_date': person.birth_date,
                              'death_date': person.death_date,
                              'birth_place': person.birth_place,
-                             'notes': person.notes})
+                             'notes': person.note})
         for face in face_encode_data:
             if f'{face.face_code}.jpeg' not in existing_files:
                 face.not_a_key = True
@@ -197,29 +198,51 @@ current_person.add_argument('notes', type=dict, action="append", required=False)
 
 class People(Resource):
     @jwt_required()
+    @family_access_required
     def get(self, face_code):
-        api_current_user = User.query.filter_by(id=get_jwt_identity()).first()
+
+        api_current_user = get_user_by_id(get_jwt_identity())
+
+        person = Person.query.filter_by(face_code=face_code).first()
+        if not person:
+            return {'message': "person is not exist"}, 404
 
         credentials = check_credentials(get_jwt_identity())
         db_handler.get_photos_from_db(api_current_user, credentials)
-        photos = [PhotoMetaData.query.filter_by(photo_id=face.photo_id).first()
+        photos = [Photo.query.filter_by(id=face.photo_id).first()
                   for face in FaceEncode.query.filter_by(key_face=face_code).all()]
 
-        person_photo = [
-            {
-                photo.photo_id: {
-                    'photo_url': photo.photo.photo_url,
-                    'title': photo.title,
-                    'description': photo.description,  # Указываем ключ для описания
-                    'location': photo.location,  # Указываем ключ для местоположения
-                    'creation_data': photo.creation_data  # Указываем ключ для данных создания
-                }
-            } for photo in photos
-        ]
-        return {'success': True, 'data': {'current_person_photos': person_photo,
+        person_data = {
+            "name": person.name,
+            "last_name": person.last_name,
+            "birth_date": person.birth_date,
+            "death_date": person.death_date,
+            "birth_place": person.birth_place,
+            "note": [
+                {
+                    "id": note.id,
+                    "author": note.author.email,
+                    "date": note.date,
+                    "note": note.note
+                } for note in person.note
+            ],
+            "photos": [
+                {
+                    photo.id: {
+                        'photo_url': photo.photo_url,
+                        'title': photo.meta_data.title if photo.meta_data else None,
+                        'description': photo.meta_data.description if photo.meta_data else None,
+                        'location': photo.meta_data.location if photo.meta_data else None,
+                        'creation_data': photo.meta_data.creation_data if photo.meta_data else None
+                    }
+                } for photo in photos
+            ]
+        }
+        return {'success': True, 'data': {'person': person_data,
                                           'message': 'OK', 'code': 200}}, 200
 
     @jwt_required()
+    @family_access_required
     def post(self, face_code):
         api_current_user = User.query.filter_by(id=get_jwt_identity()).first()
         person = Person.query.filter_by(face_code=face_code).first()
@@ -240,7 +263,15 @@ class People(Resource):
                             if len(note['note']) > 500:
                                 return {'message': 'The note is too big, please reduce its length.'}, 400
 
-                            # Создаём новый объект Notes
+                            try:
+                                # Попытка преобразовать Unix timestamp в объект datetime
+                                datetime.datetime.utcfromtimestamp(note['date'])
+                            except (TypeError, OverflowError, ValueError):
+                                # В случае ошибок возвращаем False
+                                return {"message": "date must be a UNIX timestamp"}, 400
+                            except KeyError:
+                                return {"error": "KeyError"}, 400
+
                             new_note = Note(
                                 person_id=person.id,
                                 author_id=api_current_user.id,
@@ -264,6 +295,7 @@ class People(Resource):
 
 class PersonBio(Resource):
     @jwt_required()
+    @family_access_required
     def post(self, face_code):
         api_current_user = User.query.filter_by(id=get_jwt_identity()).first()
         person_information = {}
@@ -324,12 +356,12 @@ class PersonBio(Resource):
             for part in bio['bio']:
                 event = part['event']
                 text_content = part['text_content']
-                photo_id = part['photo_id']
+                photo_id = part['photo_id'] if part['photo_id'] else None
 
                 new_part = Bio(
                     event=event,
                     text_content=text_content,
-                    photo_id=photo_id if photo_id != 0 else None,
+                    photo_id=photo_id,
                     person_id=person.id
                 )
 
@@ -342,12 +374,13 @@ class PersonBio(Resource):
         return {'success': True, 'data': {'message': 'OK', 'code': 200}}, 200
 
     @jwt_required()
+    @family_access_required
     def get(self, face_code):
 
         person = Person.query.filter_by(face_code=face_code).first()
         bio = []
         if not person.bio:
-            return {'message': 'This biography has not yet been created'}
+            return {'message': 'This biography has not yet been created'}, 404
         for i in person.bio:
             photo = Photo.query.filter_by(id=i.photo_id).first()
             bio.append({'text_content': i.text_content, 'photo_url': photo.photo_url if photo else None})
@@ -416,6 +449,7 @@ class PersonBio(Resource):
 
 class Video(Resource):
     @jwt_required()
+    @family_access_required
     def post(self, face_code):
         api_current_user = User.query.filter_by(id=get_jwt_identity()).first()
 
@@ -447,6 +481,7 @@ class Video(Resource):
         return {'success': True, 'data': {'message': 'OK', 'code': 200}}, 200
 
     @jwt_required()
+    @family_access_required
     def get(self, face_code):
         # api_current_user = User.query.filter_by(id=get_jwt_identity()).first()
 
@@ -567,8 +602,8 @@ class Video(Resource):
 
 class BindUserToPerson(Resource):
     @jwt_required()
+    @family_access_required
     def post(self, face_code):
-
         user = User.query.filter_by(id=get_jwt_identity()).first()
         person = Person.query.filter_by(face_code=face_code).first()
         user.person_id = person.id

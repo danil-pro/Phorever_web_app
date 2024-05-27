@@ -1,12 +1,10 @@
 from src import create_app
-from flask_restful import Api
 
 app, celery = create_app()
 app.app_context().push()
 
-Api(app)
-
-from src.main import *
+# with app.app_context():
+from src.main import user_photos
 
 if __name__ == '__main__':
     app.run()

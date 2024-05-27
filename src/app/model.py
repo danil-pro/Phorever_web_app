@@ -83,7 +83,7 @@ class Person(db.Model):
     birth_date = db.Column(db.BigInteger, nullable=True)
     death_date = db.Column(db.BigInteger, nullable=True)
     birth_place = db.Column(db.String(50), nullable=True)
-
+    parent_id = db.Column(db.Integer, nullable=False)
     note = db.relationship('Note', back_populates='person')
     face_code = db.Column(db.String(6), db.ForeignKey('face_encode.face_code'), nullable=False)
     face_encode = db.relationship('FaceEncode', backref='person', uselist=True)

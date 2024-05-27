@@ -1,17 +1,19 @@
 from flask import *
-from datetime import timedelta
-from flask_login import LoginManager
-from flask_user import UserManager
-from flask_mail import Mail
-from flask_restful import Api
-from flask_jwt_extended import JWTManager
-from src.app.model import db, User
 
 
 def create_app():
+
     from src.app.config import (os, SECRET_KEY,
                                 SQLALCHEMY_DATABASE_URI, STMP_SERVER, STMP_PORT, STMP_USERNAME,
                                 STMP_PASSWORD, BROKER_URI)
+
+    from datetime import timedelta
+    from flask_login import LoginManager
+    from flask_user import UserManager
+    from flask_mail import Mail
+    from flask_restful import Api
+    from flask_jwt_extended import JWTManager
+    from src.app.model import db, User
     from src.auth.auth import auth, auth_init_app
     from src.oauth2.oauth2 import oauth2
     from src.photos.photo_handler import photos, photo_init_app

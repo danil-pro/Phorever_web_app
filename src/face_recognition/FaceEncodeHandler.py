@@ -7,7 +7,7 @@ from celery import Celery, shared_task
 from pillow_heif import register_heif_opener
 
 from src.app.config import *
-from src.app.model import db, FaceEncode, User, Photo
+from src.app.model import db, FaceEncode, User, Photo, Person
 from src.photos.DBHandler import DBHandler
 
 db_handler = DBHandler()
@@ -53,6 +53,12 @@ def download_face_photos(self, photo_ids, user_id):
                                                                face_dir[2], f'{face.face_code}.jpeg')):
                                     break
 
+                                new_person = Person()
+                                new_person.face_code = face.face_code
+                                new_person.parent_id = user.parent_id
+                                db.session.add(new_person)
+                                db.session.commit()
+
                                 count = 1
                                 top, right, bottom, left = face_location
 
@@ -90,6 +96,7 @@ def download_face_photos(self, photo_ids, user_id):
                                 new_filename = f"{face.face_code}.jpeg"  # Имя файла с новым кодом и расширением
                                 new_image_path = os.path.join(faces_dir, face_dir[0], face_dir[1],
                                                               face_dir[2], new_filename)
+
                                 file = file.lstrip('/')
                                 old_image_path = os.path.join(faces_dir, file)
                                 os.rename(old_image_path, new_image_path)

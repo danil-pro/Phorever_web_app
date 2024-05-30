@@ -108,111 +108,8 @@ def add_photo():
             callback = face_encode_handler.s(current_user.id)
             chord(task_group)(callback)
 
-            # Можете дождаться выполнения chord_task, если нужно
-            # face_encode_handler(current_user.id, credentials)
-
-            # db.session.commit()
-
             return redirect(url_for('user_photos'))
     return redirect(url_for('auth.login'))
-
-
-# @photos.route('/dropbox_photos', methods=['GET', 'POST'])
-# async def dropbox_photos():
-#     if current_user.is_authenticated:
-#         if 'access_token' not in session:
-#             authorize_url = authenticator.start_auth()
-#             return flask.redirect(authorize_url)
-#         try:
-#             dbx = dropbox.Dropbox(session['access_token'])
-#
-#             if request.method == 'POST' and 'next_page' in request.form:
-#                 cursor = session['cursor']
-#                 if cursor:
-#                     files = await asyncio.to_thread(dbx.files_list_folder_continue, cursor)
-#                 else:
-#                     return redirect(url_for('photos.dropbox_photos'))
-#             else:
-#                 files = await asyncio.to_thread(dbx.files_list_folder, '', recursive=True, limit=10)
-#
-#             base_url = []
-#             for entry in files.entries:
-#                 if isinstance(entry, dropbox.files.FileMetadata) and entry.name.lower().endswith(
-#                         ('.png', '.jpg', '.jpeg', '.gif', '.bmp')):
-#                     shared_links = await asyncio.to_thread(dbx.sharing_list_shared_links, path=entry.path_display)
-#                     if len(shared_links.links) > 0:
-#                         preview_url = shared_links.links[0].url.replace("?dl=0", "?raw=1")
-#                     else:
-#                         settings = dropbox.sharing.SharedLinkSettings(
-#                             requested_visibility=dropbox.sharing.RequestedVisibility.public)
-#                         shared_link = await asyncio.to_thread(dbx.sharing_create_shared_link_with_settings,
-#                                                               entry.path_display, settings)
-#                         preview_url = shared_link.url.replace("?dl=0", "?raw=1")
-#                     if preview_url:
-#                         base_url.append(preview_url)
-#
-#             session['cursor'] = files.cursor
-#
-#             if not files.has_more:
-#                 session['cursor'] = None
-#
-#             if not base_url:
-#                 flash('No photo', 'info')
-#                 return render_template('photo_templates/img.html', source_function=url_for('photos.dropbox_photos'))
-#
-#             return render_template('photo_templates/img.html', base_url=base_url,
-#                                    source_function=url_for('photos.dropbox_photos'))
-#
-#         except AuthError as e:
-#             print(e)
-#
-#     return redirect(url_for('auth.login'))
-#
-#
-# @photos.route('/icloud_photos', methods=['GET', 'POST'])
-# def icloud_photos():
-#     if current_user.is_authenticated:
-#         try:
-#             if not current_user.apple_id:
-#                 return redirect(url_for('oauth2.icloud_authorize'))
-#             icloud_password = keyring.get_password("pyicloud", current_user.apple_id)
-#             if not icloud_password:
-#                 return redirect(url_for('oauth2.icloud_authorize'))
-#             api = PyiCloudService(current_user.apple_id, icloud_password)
-#             api.authenticate(force_refresh=True)
-#             print(api.photos.albums.keys())
-#
-#             photo_ids = set()
-#             data_url = []
-#
-#             for photo in api.photos.albums['All Photos']:
-#                 for version, data in photo.versions.items():
-#                     print(data['type'])
-#                     if photo.id not in photo_ids:
-#                         if data['type'] == 'public.jpeg':
-#                             data_url.append({'url': data['url'], 'photo_id': photo.id})
-#                             photo_ids.add(photo.id)
-#             user_photo_ids = [photo.photo_data for photo in Photo.query.filter().all()
-#                               if photo.service == '/photos/icloud_photos']
-#             if not data_url:
-#                 flash('No photo', 'info')
-#                 return render_template('photo_templates/img.html', source_function=url_for('photos.icloud_photos'))
-#             for user_photo_id in user_photo_ids:
-#                 for data in data_url:
-#                     if user_photo_id == next(iter(data)):
-#                         data_url.remove(data)
-#
-#             return render_template('photo_templates/img.html', base_url=data_url,
-#                                    source_function=url_for('photos.icloud_photos'))
-#
-#         except PyiCloudNoStoredPasswordAvailableException:
-#             flash('invalid password')
-#             return redirect(url_for('oauth2.icloud_authorize'))
-#         except PyiCloudFailedLoginException:
-#             return redirect(url_for('oauth2.icloud_authorize'))
-#         except PyiCloudServiceNotActivatedException:
-#             return redirect(url_for('oauth2.icloud_authorize'))
-#     return redirect(url_for('auth.login'))
 
 
 @photos.route('/<photo_id>')
@@ -398,11 +295,6 @@ Phorever
         return redirect(url_for('auth.login'))
 
 
-# google_data = reqparse.RequestParser()
-# google_data.add_argument("next_page_token", type=str, help="next_page_token")
-# google_data.add_argument("limit", type=int, help="limit")
-
-
 def get_google_photos(next_page_token=None, limit=100):
     api_current_user = User.query.filter_by(id=get_jwt_identity()).first()
     if api_current_user.google_credentials_create_at is None:
@@ -433,45 +325,6 @@ def get_google_photos(next_page_token=None, limit=100):
                                           'message': 'OK'}}, 200
     except AuthError as e:
         return {'google_uri': google_authorize(api_current_user.id)}
-
-
-# def get_icloud_photos():
-#     api_current_user = User.query.filter_by(id=get_jwt_identity()).first()
-#     try:
-#         if api_current_user.apple_id is None:
-#             return {'icloud_uri': url_for('oauth2.icloud_authorize', user=api_current_user.email, _external=True)}
-#         api = api_current_user.icloud_api()
-#         if type(api) is dict and 'icloud_uri' in api:
-#             return api
-#         photo_ids = set()
-#         data_url = []
-#
-#         for photo in api.photos.albums['All Photo']:
-#             for version, data in photo.versions.items():
-#                 date_object = datetime.fromisoformat(str(photo.created))
-#                 unix_time = int(date_object.timestamp())
-#
-#                 if data['type'] == 'public.jpeg' and photo.id not in photo_ids:
-#                     data_url.append({'photoId': photo.id, 'baseUrl': data['url'],
-#                                      'creationTime': unix_time})
-#                     photo_ids.add(photo.id)
-#
-#         user_photo_ids = [photo.photo_data for photo in Photo.query.filter().all()
-#                           if photo.service == '/photos/icloud_photos']
-#         if not data_url:
-#             return {'message': 'no photos'}
-#         for user_photo_id in user_photo_ids:
-#             for data in data_url:
-#                 if user_photo_id == next(iter(data)):
-#                     data_url.remove(data)
-#
-#         return {'success': True, 'data': {'google_photo_data': data_url,
-#                                           'message': 'OK'}}, 200
-#
-#     except PyiCloudNoStoredPasswordAvailableException:
-#         return {'icloud_uri': url_for('oauth2.icloud_authorize', user=api_current_user.email, _external=True)}
-#     except PyiCloudFailedLoginException:
-#         return {'icloud_uri': url_for('oauth2.icloud_authorize', user=api_current_user.email, _external=True)}
 
 
 api_photo_data = reqparse.RequestParser()
@@ -596,12 +449,10 @@ class UserPhoto(Resource):
                 results = service.mediaItems().list(
                     pageSize=limit,
                     pageToken=page_token,
-                    # fields='nextPageToken,mediaItems(id,baseUrl,mediaMetadata)',
                 ).execute()
             else:
                 results = service.mediaItems().list(
                     pageSize=limit
-                    # fields='nextPageToken,mediaItems(id,baseUrl,mediaMetadata)',
                 ).execute()
             items = results.get('mediaItems', [])
             for item in items:

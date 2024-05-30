@@ -9,7 +9,7 @@ from flask_restful import Api, Resource, reqparse
 
 from src.app.Forms import AddFaceName, AddFamilyMemberForm
 from src.app.config import *
-from src.app.model import db, Photo, User, PhotoMetaData, FaceEncode, Person, Note, Bio
+from src.app.model import db, Photo, User, FaceEncode, Person, Note, Bio
 from src.auth.auth import current_user
 from src.face_recognition.FaceEncodeHandler import face_folders
 from src.oauth2.oauth2 import check_credentials
@@ -119,27 +119,6 @@ def one_face_people(face_code):
                                face_path='/'.join([face_code[i:i+2] for i in range(0, len(face_code), 2)]))
     else:
         return redirect(url_for('auth.login'))
-
-
-# @people_face.route('/bio/<face_code>', methods=['GET', 'POST'])
-# def bio(face_code):
-#     if current_user.is_authenticated:
-#         face_code_lower = face_code.lower()
-#         face_dir = [face_code_lower[i:i + 2] for i in range(0, len(face_code_lower), 2)]
-#         save_path = os.path.join(face_dir[0], face_dir[1], face_dir[2], f"{face_code}.mp3")
-#
-#         person = Person.query.filter_by(face_code=face_code).first()
-#         bio = []
-#         if not person.bio:
-#             flash("hui")
-#             return redirect(url_for("people.one_face_people", face_code=face_code))
-#         for i in person.bio:
-#             photo = Photo.query.filter_by(id=i.photo_id).first()
-#             bio.append({'text_content': i.text_content, 'photo_url': photo.photo_url if photo else None})
-#         gtts(face_code)
-#         return render_template('person_template/bio.html', bio=bio, sound=save_path)
-#     else:
-#         return redirect(url_for('auth.login'))
 
 
 class Peoples(Resource):

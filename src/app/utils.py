@@ -5,7 +5,6 @@ from src.app.model import FaceEncode, User, Person
 from flask_mail import Mail, Message
 from flask import jsonify
 from flask_jwt_extended import get_jwt_identity
-import json
 
 mail = Mail()
 

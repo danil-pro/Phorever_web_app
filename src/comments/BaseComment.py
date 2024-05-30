@@ -28,7 +28,7 @@ class BaseComment(Resource):
 
         # Проверка разрешений для комментирования
         if api_current_user.id == target_owner_id and not reply_user_email:
-            return {'message': f'You cannot leave a comment under your own {target_type}'}, 400
+            return {'message': f'You cannot leave a comment under {target_type}'}, 400
         if api_current_user.id != target_owner_id and reply_user_email:
             return {'message': 'You are not allowed to reply to this comment'}, 403
 

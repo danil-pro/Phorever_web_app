@@ -151,25 +151,13 @@ def face_recognition_handler(face_encodes):
 
                         if all(is_match):
                             temp_dict[photo_id] = [encode, code]
-                            # face1 = FaceEncode.query.filter_by(face_code=code).first()
-                            # # if not face1.key_face:
-                            # face1.key_face = code1
-                            # db.session.commit()
-                            # check_ids.append(photo_id)
-                            check_codes.append(code)
 
-                        # elif photo_id in list(match_photo_ids.keys()):
-                        #     del temp_dict[photo_id]
+                            check_codes.append(code)
 
             match_photo_ids.update(temp_dict)
 
             matches.append({photo_id1: [code1, [{key: val[1]} for key, val in match_photo_ids.items()]]})
 
-        # for data in matches:
-        #     for key, val in data.items():
-        #         data[key] = [val[1], val[2]]
-
-        print(matches)
         return matches
 
     except Exception as e:

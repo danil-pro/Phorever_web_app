@@ -4,9 +4,6 @@ from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
 from datetime import datetime, timedelta
 import itertools
-import keyring
-from pyicloud import PyiCloudService
-from pyicloud.exceptions import PyiCloudFailedLoginException
 
 from src.app.config import *
 
@@ -23,10 +20,6 @@ class DBHandler:
 
         google_photo_ids = [photo.photo_data for photo in user_photos if
                             photo.service == '/photos/google_photos']
-        # dropbox_photo_urls = [photo.photo_data for photo in user_photos if
-        #                        photo.service == '/photos/dropbox_photos']
-        icloud_photos_ids = [photo.photo_data for photo in user_photos if
-                             photo.service == '/photos/icloud_photos']
 
         if google_photo_ids:
 
@@ -69,8 +62,6 @@ class DBHandler:
                                                        token_uri=credentials['token_uri'],
                                                        client_id=credentials['client_id'],
                                                        client_secret=credentials['client_secret'])
-                        # if not auth_credentials.valid:
-                        #     if auth_credentials.refresh_token:
                         auth_credentials.refresh(Request())
 
                         drive = build(serviceName=API_SERVICE_NAME,
@@ -105,58 +96,6 @@ class DBHandler:
                     except RefreshError as e:
                         print(e)
                         return 'An error occurred.' + str(e)
-
-        # if dropbox_photo_urls:
-        #     for url in dropbox_photo_urls:
-        #         photo_id = Photo.query.filter_by(photo_data=url).first()
-        #         photo_url[photo_id.id] = {'baseUrl': url,
-        #                                   'description': 'Empty description',
-        #                                   'creationTime': '0000-00-00'}
-        if icloud_photos_ids:
-            photo_created_at = [photo.created_at for photo in user_photos if
-                                photo.service == '/photos/icloud_photos']
-            new_photo = [photo.photo_data for photo in user_photos if
-                         photo.service == '/photos/icloud_photos'
-                         and photo.created_at == datetime.strptime('2023-07-13 15:30:45.123456',
-                                                                   '%Y-%m-%d %H:%M:%S.%f')]
-            time_difference = datetime.now() - photo_created_at[0]
-
-            if time_difference >= timedelta(hours=1) or new_photo or update:
-                try:
-                    photo_data_dict = {}  # Dictionary to store photo data
-
-                    for icloud_photo_id in icloud_photos_ids:
-                        photo_id = Photo.query.filter_by(photo_data=icloud_photo_id).first()
-                        icloud_password = keyring.get_password("pyicloud", photo_id.apple_id)
-
-                        if photo_id.apple_id not in photo_data_dict:
-                            api = PyiCloudService(photo_id.apple_id, icloud_password)
-                            api.authenticate(force_refresh=True)
-                            photo_data_dict[
-                                photo_id.apple_id] = {}  # Initialize a new inner dictionary for each apple_id
-
-                            for photo in api.photos.albums['All Photos']:
-                                for version, data in photo.versions.items():
-                                    if data['type'] == 'public.jpeg':
-                                        photo_data_dict[photo_id.apple_id][photo.id] = {'baseUrl': data['url'],
-                                                                                        'creationTime': photo.created}
-
-                    for icloud_photo_id in icloud_photos_ids:
-                        photo = Photo.query.filter_by(photo_data=icloud_photo_id).first()
-
-                        photo_meta_data = photo.meta_data
-                        if photo.apple_id in photo_data_dict:
-                            apple_id_data = photo_data_dict[photo.apple_id]
-                            for key, val in apple_id_data.items():
-                                if icloud_photo_id == key:
-                                    photo.created_at = datetime.now()
-                                    photo.photo_url = val['baseUrl']
-                                    if not photo_meta_data.creation_data:
-                                        photo_meta_data.creation_data = int(
-                                            datetime.strptime(str(val['creationTime']).split()[0],
-                                                              '%Y-%m-%d').timestamp())
-                except PyiCloudFailedLoginException:
-                    return ''
 
     @staticmethod
     def get_photo_data_from_db(user_photo, credentials):

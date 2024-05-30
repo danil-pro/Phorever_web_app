@@ -55,7 +55,6 @@ def download_photos(self, photo_url, photo_id, user_id):
 
     face_objects = []
     for faces in encode:
-        # time.sleep(1)
         code = generate_unique_code()
         face = FaceEncode(
             face_encode=faces,
@@ -67,7 +66,6 @@ def download_photos(self, photo_url, photo_id, user_id):
         face_objects.append(face)
 
     try:
-        # time.sleep(1)
         db.session.bulk_save_objects(face_objects)
         db.session.commit()
     except Exception as e:
